@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hilmir · OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy:     #0C2040;
+      --navy2:    #1A3A60;
+      --sky:      #3AAFD4;
+      --sky-l:    #7DCFEA;
+      --sky-g:    rgba(58,175,212,0.22);
+      --ice:      rgba(235,248,255,0.55);
+      --ice-h:    rgba(240,251,255,0.72);
+      --glass-b:  rgba(255,255,255,0.85);
+      --glass-bi: rgba(255,255,255,0.95);
+      --green:    #0DAC72;
+      --green-g:  rgba(13,172,114,0.2);
+      --amber:    #C97B10;
+      --amber-g:  rgba(201,123,16,0.18);
+      --ember:    #D84B28;
+      --ember-g:  rgba(216,75,40,0.18);
+      --teal:     #0899A0;
+      --teal-g:   rgba(8,153,160,0.18);
+      --indigo:   #4D65D8;
+      --indigo-g: rgba(77,101,216,0.18);
+      --pink:     #C43890;
+      --pink-g:   rgba(196,56,144,0.18);
+      --soft:     #4A6A88;
+      --muted:    #7A9AB8;
+      --dim:      rgba(12,32,64,0.07);
+      --text:     #0C2040;
+      --shadow:   0 4px 24px rgba(30,100,160,0.09), 0 1px 4px rgba(30,100,160,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
+      --shadow-h: 0 12px 40px rgba(30,100,160,0.14), 0 2px 8px rgba(30,100,160,0.08), inset 0 1px 0 rgba(255,255,255,0.95);
+      --f:  'Inter', sans-serif;
+      --fg: 'Space Grotesk', sans-serif;
+      --m:  'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html { font-size:16px; }
+
+    body {
+      background: #FFFFFF;
+      color: var(--text);
+      font-family: var(--f);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ══ BACKGROUND BLOBS ═══════════════════════════════ */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      will-change: transform;
+    }
+    .blob-1 {
+      width: 750px; height: 750px;
+      background: radial-gradient(circle at center, rgba(120,205,245,0.52) 0%, rgba(160,220,250,0.3) 35%, transparent 70%);
+      filter: blur(80px);
+      top: -220px; left: -150px;
+      animation: drift1 28s ease-in-out infinite alternate;
+    }
+    .blob-2 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle at center, rgba(90,185,240,0.45) 0%, rgba(140,215,250,0.25) 40%, transparent 70%);
+      filter: blur(90px);
+      bottom: -150px; right: -100px;
+      animation: drift2 34s ease-in-out infinite alternate;
+    }
+    .blob-3 {
+      width: 450px; height: 450px;
+      background: radial-gradient(circle at center, rgba(180,230,252,0.5) 0%, transparent 70%);
+      filter: blur(70px);
+      top: 38%; left: 42%;
+      animation: drift3 22s ease-in-out infinite alternate;
+    }
+    .blob-4 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle at center, rgba(100,195,245,0.35) 0%, transparent 70%);
+      filter: blur(60px);
+      top: 18%; right: 22%;
+      animation: drift4 18s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(70px,90px) scale(1.08)} }
+    @keyframes drift2 { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(-60px,-70px) scale(1.06)} }
+    @keyframes drift3 { 0%{transform:translate(0,0)} 100%{transform:translate(-90px,50px)} }
+    @keyframes drift4 { 0%{transform:translate(0,0)} 100%{transform:translate(40px,-60px)} }
+
+    /* ══ SIDEBAR ════════════════════════════════════════ */
+    .sb {
+      position: fixed; top:0; left:0;
+      width: 220px; height: 100dvh;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      border-right: 1px solid rgba(170,215,240,0.5);
+      display: flex; flex-direction: column;
+      z-index: 100;
+      box-shadow: 2px 0 20px rgba(30,100,160,0.07);
+    }
+
+    .sb-brand {
+      padding: 1.7rem 1.5rem 1.3rem;
+      border-bottom: 1px solid rgba(170,215,240,0.4);
+    }
+
+    .sb-avatar {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--navy) 0%, #1E5080 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--fg); font-size: 1.1rem; font-weight: 700;
+      color: #fff; margin-bottom: .75rem;
+      box-shadow: 0 4px 14px rgba(12,32,64,0.2);
+    }
+
+    .sb-name {
+      font-family: var(--fg);
+      font-size: .86rem; font-weight: 700;
+      color: var(--navy); letter-spacing: .02em;
+    }
+
+    .sb-sub {
+      font-family: var(--m);
+      font-size: .54rem; color: var(--muted);
+      margin-top: .18rem; letter-spacing: .06em;
+    }
+
+    .sb-section-label {
+      font-family: var(--m); font-size: .5rem; font-weight: 500;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--muted); padding: .9rem 1.5rem .35rem;
+    }
+
+    .sb-nav { flex: 1; overflow-y: auto; padding-bottom: .5rem; }
+
+    .sb-item {
+      display: flex; align-items: center; gap: .72rem;
+      padding: .54rem 1.1rem .54rem 1.5rem;
+      font-size: .87rem; font-weight: 400;
+      color: var(--soft); text-decoration: none;
+      margin: 0 .6rem;
+      border-radius: 10px;
+      transition: color .15s, background .15s;
+    }
+    .sb-item:hover {
+      color: var(--navy);
+      background: rgba(58,175,212,0.1);
+    }
+
+    .sb-emoji { font-size: .95rem; width: 20px; text-align: center; flex-shrink: 0; }
+    .sb-item-label { flex: 1; }
+    .sb-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; opacity: .45; }
+
+    .sb-foot {
+      padding: 1.2rem 1.5rem;
+      border-top: 1px solid rgba(170,215,240,0.4);
+      background: rgba(240,250,255,0.5);
+    }
+
+    .sb-clock {
+      font-family: var(--m); font-size: 1.55rem; font-weight: 400;
+      color: var(--navy); line-height: 1;
+    }
+    .sb-sec { font-size: .55em; color: var(--sky); animation: pulse-sec 1s ease-in-out infinite; }
+    @keyframes pulse-sec { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+    .sb-dateline { font-family:var(--m); font-size:.57rem; color:var(--muted); margin-top:.3rem; }
+    .sb-weather  { font-family:var(--m); font-size:.55rem; color:var(--muted); margin-top:.14rem; }
+
+    /* ══ MAIN ═══════════════════════════════════════════ */
+    .main {
+      margin-left: 220px; flex: 1;
+      padding: 0 1.4rem 3.5rem;
+      position: relative; z-index: 1;
+    }
+
+    /* ══ DAY BAR ════════════════════════════════════════ */
+    .day-wrap { display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; padding:0 .1rem; }
+    .day-track { flex:1; height:3px; background:rgba(58,175,212,0.12); border-radius:3px; }
+    .day-fill {
+      height:100%; border-radius:3px;
+      background: linear-gradient(90deg, var(--sky-l), var(--navy));
+      position: relative; transition: width 60s linear;
+    }
+    .day-fill::after {
+      content:''; position:absolute; right:-5px; top:-5px;
+      width:13px; height:13px; border-radius:50%;
+      background: var(--navy);
+      box-shadow: 0 0 0 3px rgba(58,175,212,0.25), 0 0 0 6px rgba(58,175,212,0.08);
+    }
+    .day-pct { font-family:var(--m); font-size:.56rem; color:var(--muted); flex-shrink:0; }
+
+    /* ══ GLASS CARD ═════════════════════════════════════ */
+    .w {
+      background: var(--ice);
+      backdrop-filter: blur(24px) saturate(160%);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      border: 1.5px solid var(--glass-b);
+      border-radius: 20px;
+      padding: 1.15rem 1.3rem;
+      position: relative; overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: box-shadow .22s, transform .22s, background .22s;
+      animation: rise .5s ease both;
+    }
+    .w:hover {
+      background: var(--ice-h);
+      box-shadow: var(--shadow-h);
+      transform: translateY(-2px);
+      border-color: var(--glass-bi);
+    }
+    @keyframes rise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+    /* Inner top-edge highlight (glass depth) */
+    .w::after {
+      content:'';
+      position: absolute; top:0; left:0; right:0; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9) 30%, rgba(255,255,255,0.9) 70%, transparent);
+      border-radius: 20px 20px 0 0;
+    }
+
+    /* Colored accent chip per card */
+    .chip {
+      position: absolute; top:1rem; right:1.1rem;
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items:center; justify-content:center;
+      font-size: .8rem;
+      opacity: .75;
+    }
+
+    /* Label */
+    .wl {
+      font-family: var(--m); font-size: .56rem; font-weight: 500;
+      letter-spacing: .13em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: .7rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .wlp { width:4px; height:4px; border-radius:50%; display:inline-block; margin-right:.4rem; }
+
+    /* ══ BENTO ══════════════════════════════════════════ */
+    .bento {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr 0.95fr 0.95fr;
+      gap: .9rem;
+    }
+    .s2c { grid-column: span 2; }
+    .s2r { grid-row: span 2; }
+
+    .bento>.w:nth-child(1)  {animation-delay:.03s}
+    .bento>.w:nth-child(2)  {animation-delay:.07s}
+    .bento>.w:nth-child(3)  {animation-delay:.11s}
+    .bento>.w:nth-child(4)  {animation-delay:.15s}
+    .bento>.w:nth-child(5)  {animation-delay:.19s}
+    .bento>.w:nth-child(6)  {animation-delay:.23s}
+    .bento>.w:nth-child(7)  {animation-delay:.27s}
+    .bento>.w:nth-child(8)  {animation-delay:.31s}
+    .bento>.w:nth-child(9)  {animation-delay:.35s}
+    .bento>.w:nth-child(10) {animation-delay:.39s}
+    .bento>.w:nth-child(11) {animation-delay:.43s}
+
+    /* ══ CLOCK ══════════════════════════════════════════ */
+    .w-clock { padding: 1.6rem 1.8rem; }
+    .greet { font-family:var(--fg); font-size:.78rem; font-weight:500; color:var(--soft); margin-bottom:.3rem; }
+    .bigtime {
+      font-family: var(--m);
+      font-size: clamp(2.9rem, 4.5vw, 4.2rem);
+      font-weight: 300; line-height: 1; color: var(--navy);
+      letter-spacing: -.04em;
+    }
+    .bigsec { font-size:.38em; color:var(--sky); animation:pulse-sec 1s ease-in-out infinite; vertical-align:super; margin-left:3px; }
+    .clock-meta { display:flex; gap:.9rem; margin-top:.5rem; flex-wrap:wrap; }
+    .clock-tag { font-family:var(--m); font-size:.59rem; color:var(--muted); }
+
+    /* ══ NEXT EVENT ═════════════════════════════════════ */
+    .next-name  { font-family:var(--fg); font-size:.9rem; font-weight:600; color:var(--navy); line-height:1.35; }
+    .next-at    { font-family:var(--m); font-size:.63rem; color:var(--amber); margin-top:.28rem; }
+    .next-count { font-family:var(--m); font-size:2rem; font-weight:300; color:var(--navy); margin-top:.4rem; line-height:1; letter-spacing:-.02em; }
+    .next-sub   { font-size:.62rem; color:var(--muted); margin-top:.15rem; }
+
+    /* ══ HEALTH ═════════════════════════════════════════ */
+    .hrow { display:flex; justify-content:space-between; align-items:center; padding:.4rem 0; border-bottom:1px solid var(--dim); }
+    .hrow:last-child { border-bottom:none; }
+    .hlbl { font-size:.76rem; color:var(--soft); }
+    .hval { font-family:var(--m); font-size:.76rem; color:var(--text); }
+    .hval.tap { cursor:pointer; transition:color .15s; }
+    .hval.tap:hover { color:var(--sky); }
+    .nutr { display:flex; gap:.25rem; }
+    .nb { background:none; border:1.5px solid rgba(12,32,64,0.12); border-radius:20px; padding:.13rem .42rem; font-family:var(--m); font-size:.55rem; color:var(--muted); cursor:pointer; transition:all .15s; }
+    .nb:hover { border-color:var(--navy); color:var(--navy); }
+    .nb.sel.great { background:rgba(13,172,114,.1); border-color:var(--green); color:var(--green); }
+    .nb.sel.fine  { background:rgba(201,123,16,.08); border-color:var(--amber); color:var(--amber); }
+    .nb.sel.ass   { background:rgba(216,75,40,.08); border-color:var(--ember); color:var(--ember); }
+
+    /* ══ CALENDAR ═══════════════════════════════════════ */
+    .ev { display:flex; gap:.75rem; padding:.4rem 0; border-bottom:1px solid var(--dim); align-items:flex-start; }
+    .ev:last-child { border-bottom:none; }
+    .ev-line { width:2px; align-self:stretch; min-height:1.8rem; border-radius:2px; flex-shrink:0; margin-top:.1rem; }
+    .ev-r { flex:1; min-width:0; }
+    .ev-t { font-family:var(--m); font-size:.58rem; color:var(--muted); }
+    .ev-n { font-size:.8rem; color:var(--text); margin-top:.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wk-day { margin-top:.85rem; }
+    .wk-hd  { font-family:var(--m); font-size:.54rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; margin-bottom:.15rem; }
+
+    /* ══ GOALS ══════════════════════════════════════════ */
+    .gbar-row { display:flex; align-items:center; gap:.6rem; margin-bottom:.7rem; }
+    .gbar-track { flex:1; height:2px; background:var(--dim); border-radius:2px; overflow:hidden; }
+    .gbar-fill  { height:100%; background:linear-gradient(90deg,var(--sky-l),var(--navy)); border-radius:2px; transition:width .4s; }
+    .gbar-pct   { font-family:var(--m); font-size:.58rem; color:var(--navy); flex-shrink:0; }
+    .goal { display:flex; align-items:flex-start; gap:.5rem; padding:.36rem 0; border-bottom:1px solid var(--dim); }
+    .goal:last-child { border-bottom:none; }
+    .gbox { width:13px; height:13px; border:1.5px solid rgba(12,32,64,0.15); border-radius:4px; flex-shrink:0; cursor:pointer; margin-top:.14rem; position:relative; transition:all .15s; }
+    .gbox.done { background:var(--navy); border-color:var(--navy); box-shadow:0 0 0 2px rgba(12,32,64,0.1); }
+    .gbox.done::after { content:''; position:absolute; left:2px; top:0; width:5px; height:9px; border:1.5px solid #fff; border-top:none; border-left:none; transform:rotate(45deg); }
+    .gtxt { font-size:.79rem; color:var(--text); line-height:1.4; flex:1; }
+    .gtxt.done { color:var(--muted); text-decoration:line-through; text-decoration-color:var(--muted); }
+    .ghost-btn { background:none; border:none; font-family:var(--m); font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); cursor:pointer; margin-top:.6rem; padding:0; display:block; transition:color .15s; }
+    .ghost-btn:hover { color:var(--navy); }
+
+    /* ══ MACROS ═════════════════════════════════════════ */
+    .mac-num { font-family:var(--m); font-size:2.6rem; font-weight:300; color:var(--navy); line-height:1; letter-spacing:-.03em; transition:color .4s; }
+    .mac-num.near { color:var(--ember); }
+    .mac-num.over { color:#CC2000; }
+    .mac-sub { font-family:var(--m); font-size:.58rem; color:var(--muted); margin-top:.15rem; }
+    .mac-track { height:3px; background:rgba(58,175,212,0.12); border-radius:3px; overflow:hidden; margin:.7rem 0 .55rem; }
+    .mac-fill  { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--sky-l),var(--navy)); transition:width .4s; }
+    .mac-fill.near { background:linear-gradient(90deg,var(--amber),var(--ember)); }
+    .mac-cols  { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; }
+    .mac-col   { display:flex; flex-direction:column; gap:.14rem; }
+    .mac-lbl   { font-family:var(--m); font-size:.5rem; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; }
+    .mac-inp   { background:rgba(255,255,255,0.65); border:1.5px solid rgba(12,32,64,0.1); border-radius:7px; padding:.28rem .35rem; font-family:var(--m); font-size:.68rem; color:var(--text); width:100%; text-align:center; transition:all .15s; }
+    .mac-inp:focus { outline:none; border-color:var(--sky); background:rgba(255,255,255,0.9); }
+
+    /* ══ GITHUB ═════════════════════════════════════════ */
+    .streak-wrap  { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.5rem; }
+    .streak-num   { font-family:var(--m); font-size:3rem; font-weight:300; color:var(--navy); line-height:1; letter-spacing:-.04em; }
+    .streak-unit  { font-family:var(--m); font-size:.6rem; color:var(--soft); line-height:1.4; }
+    .commit       { display:flex; flex-direction:column; gap:.04rem; padding:.34rem 0; border-bottom:1px solid var(--dim); }
+    .commit:last-child { border-bottom:none; }
+    .commit-repo  { font-family:var(--m); font-size:.58rem; color:var(--sky); }
+    .commit-msg   { font-size:.76rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .commit-age   { font-family:var(--m); font-size:.53rem; color:var(--muted); }
+    .gh-link      { font-family:var(--m); font-size:.56rem; color:var(--sky); text-decoration:none; display:block; margin-top:.6rem; }
+    .gh-link:hover { text-decoration:underline; }
+
+    /* ══ OBSIDIAN ═══════════════════════════════════════ */
+    .obs-sec-hd { font-family:var(--m); font-size:.52rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; margin-bottom:.42rem; display:flex; align-items:center; gap:.4rem; }
+    .obs-sec-hd::after { content:''; flex:1; height:1px; background:var(--dim); }
+    .obs-goal { display:flex; align-items:flex-start; gap:.45rem; padding:.28rem 0; border-bottom:1px solid var(--dim); }
+    .obs-goal:last-child { border-bottom:none; }
+    .obs-bul { width:3px; height:3px; border-radius:50%; background:var(--sky); flex-shrink:0; margin-top:.44rem; }
+    .obs-gtxt { font-size:.76rem; color:var(--soft); line-height:1.4; flex:1; }
+    .obs-inp-row { display:flex; gap:.38rem; }
+    .obs-inp { flex:1; background:rgba(255,255,255,0.65); border:1.5px solid rgba(12,32,64,0.1); border-radius:8px; padding:.3rem .5rem; font-family:var(--f); font-size:.73rem; color:var(--text); transition:all .15s; }
+    .obs-inp:focus { outline:none; border-color:var(--sky); background:rgba(255,255,255,0.9); }
+    .obs-inp::placeholder { color:var(--muted); }
+    .obs-send { background:var(--navy); border:none; border-radius:8px; padding:.3rem .65rem; font-family:var(--m); font-size:.62rem; color:#fff; cursor:pointer; transition:opacity .15s; flex-shrink:0; }
+    .obs-send:hover { opacity:.8; }
+    .obs-btns { display:flex; gap:.4rem; margin-top:.55rem; flex-wrap:wrap; }
+    .obs-btn  { display:inline-flex; align-items:center; gap:.3rem; font-size:.7rem; border-radius:8px; padding:.26rem .6rem; text-decoration:none; cursor:pointer; transition:all .15s; border:1.5px solid; font-family:var(--f); }
+    .obs-btn.p { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .obs-btn.p:hover { opacity:.82; }
+    .obs-btn.s { background:rgba(255,255,255,0.5); border-color:rgba(12,32,64,0.12); color:var(--soft); }
+    .obs-btn.s:hover { border-color:var(--navy); color:var(--navy); }
+
+    /* ══ FINANCE ════════════════════════════════════════ */
+    .fin-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-bottom:.65rem; }
+    .fin-cell { display:flex; flex-direction:column; gap:.1rem; }
+    .fin-lbl  { font-family:var(--m); font-size:.5rem; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; }
+    .fin-val  { font-family:var(--m); font-size:1.25rem; font-weight:300; color:var(--navy); line-height:1; cursor:pointer; transition:color .15s; letter-spacing:-.02em; }
+    .fin-val:hover { color:var(--teal); }
+    .fin-val.warn { color:var(--ember); }
+    .fin-val.good { color:var(--teal); }
+    .fin-sub  { font-family:var(--m); font-size:.52rem; color:var(--muted); }
+    .fin-track { height:3px; background:rgba(58,175,212,0.12); border-radius:3px; overflow:hidden; margin:.6rem 0 .55rem; }
+    .fin-fill  { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--sky-l),var(--navy)); transition:width .4s; }
+    .fin-fill.warn { background:linear-gradient(90deg,var(--amber),var(--ember)); }
+    .fin-open { display:inline-flex; align-items:center; gap:.3rem; font-size:.7rem; color:var(--navy); text-decoration:none; border:1.5px solid rgba(12,32,64,0.14); border-radius:8px; padding:.24rem .6rem; transition:all .15s; background:rgba(255,255,255,0.5); }
+    .fin-open:hover { background:var(--navy); color:#fff; border-color:var(--navy); }
+
+    /* ══ PROJECTS ═══════════════════════════════════════ */
+    .proj-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 1.4rem; }
+    .proj { display:flex; align-items:center; gap:.55rem; padding:.36rem 0; border-bottom:1px solid var(--dim); }
+    .proj:last-child { border-bottom:none; }
+    .pdot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .pdot.a { background:var(--green); animation:pdot 2.5s ease-in-out infinite; }
+    @keyframes pdot { 0%{box-shadow:0 0 0 0 rgba(13,172,114,.5)} 70%{box-shadow:0 0 0 5px rgba(13,172,114,0)} 100%{box-shadow:0 0 0 0 rgba(13,172,114,0)} }
+    .pdot.p { background:var(--muted); }
+    .pdot.d { background:var(--sky); }
+    .pn { font-size:.78rem; flex:1; color:var(--text); }
+    .ps { font-family:var(--m); font-size:.54rem; color:var(--muted); }
+
+    /* ══ MILAN ══════════════════════════════════════════ */
+    .milan-hero { display:flex; align-items:flex-end; gap:.6rem; margin:.1rem 0 .35rem; }
+    .milan-days { font-family:var(--m); font-size:4rem; font-weight:300; color:var(--navy); line-height:1; letter-spacing:-.05em; }
+    .milan-unit { font-family:var(--m); font-size:.72rem; color:var(--pink); margin-bottom:.6rem; font-weight:500; }
+    .milan-sub  { font-size:.8rem; color:var(--soft); margin-top:.15rem; line-height:1.55; }
+    .milan-date { font-family:var(--m); font-size:.58rem; color:var(--muted); margin-top:.45rem; }
+
+    /* ══ UTILS ══════════════════════════════════════════ */
+    .spin  { font-family:var(--m); font-size:.63rem; color:var(--muted); animation:breathe 1.5s ease-in-out infinite; }
+    @keyframes breathe { 0%,100%{opacity:.2} 50%{opacity:.65} }
+    .ghost { font-family:var(--m); font-size:.63rem; color:var(--muted); padding:.22rem 0; }
+
+    :focus-visible { outline:2px solid var(--sky); outline-offset:3px; border-radius:6px; }
+
+    /* ══ MOBILE ═════════════════════════════════════════ */
+    @media (max-width:980px) {
+      body { flex-direction:column; }
+      .sb { position:relative; width:100%; height:auto; flex-direction:row; align-items:center; padding:.7rem 1rem; border-right:none; border-bottom:1px solid rgba(170,215,240,0.4); flex-wrap:wrap; }
+      .sb-brand { padding:0; border:none; margin-right:auto; }
+      .sb-sub,.sb-section-label,.sb-avatar { display:none; }
+      .sb-nav { flex:none; flex-direction:row; flex-wrap:wrap; padding:0; }
+      .sb-item { padding:.28rem .5rem; font-size:.78rem; border-radius:8px; }
+      .sb-foot { padding:0 0 0 .5rem; border:none; background:none; }
+      .sb-clock { font-size:.9rem; }
+      .sb-dateline,.sb-weather { display:none; }
+      .main { margin-left:0; padding:1rem .8rem 3rem; }
+      .bento { grid-template-columns:1fr 1fr; }
+      .s2c { grid-column:span 2; }
+      .s2r { grid-row:auto; }
+    }
+    @media (max-width:520px) {
+      .bento { grid-template-columns:1fr; }
+      .s2c,.s2r { grid-column:1; grid-row:auto; }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .blob,.spin,.pdot.a,.w,.day-fill { animation:none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- BACKGROUND BLOBS -->
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+<div class="blob blob-4"></div>
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-brand">
+    <div class="sb-avatar">H</div>
+    <div class="sb-name">Hilmir</div>
+    <div class="sb-sub">personal os · v3</div>
+  </div>
+
+  <div class="sb-section-label">Apps</div>
+  <nav class="sb-nav">
+    <a class="sb-item" href="../Finance/my-finance.html" target="_blank">
+      <span class="sb-emoji">💰</span><span class="sb-item-label">Finance</span>
+      <span class="sb-dot" style="background:var(--teal)"></span>
+    </a>
+    <a class="sb-item" href="obsidian://open?vault=Vault" target="_blank">
+      <span class="sb-emoji">🧠</span><span class="sb-item-label">Obsidian</span>
+      <span class="sb-dot" style="background:var(--indigo)"></span>
+    </a>
+    <a class="sb-item" href="https://hilmirkarlsson.github.io/macrostracker/" target="_blank">
+      <span class="sb-emoji">🥗</span><span class="sb-item-label">Macros</span>
+      <span class="sb-dot" style="background:var(--ember)"></span>
+    </a>
+    <a class="sb-item" href="https://calendar.google.com" target="_blank">
+      <span class="sb-emoji">📅</span><span class="sb-item-label">Calendar</span>
+      <span class="sb-dot" style="background:var(--amber)"></span>
+    </a>
+    <a class="sb-item" href="https://github.com/hilmirkarlsson" target="_blank">
+      <span class="sb-emoji">🐙</span><span class="sb-item-label">GitHub</span>
+      <span class="sb-dot" style="background:var(--soft)"></span>
+    </a>
+    <a class="sb-item" href="https://isavia-eftirlit.vercel.app" target="_blank">
+      <span class="sb-emoji">✈️</span><span class="sb-item-label">Eftirlit</span>
+      <span class="sb-dot" style="background:var(--sky)"></span>
+    </a>
+    <a class="sb-item" href="https://hilmirkarlsson.github.io/Books/" target="_blank">
+      <span class="sb-emoji">📚</span><span class="sb-item-label">Books</span>
+      <span class="sb-dot" style="background:var(--green)"></span>
+    </a>
+    <a class="sb-item" href="https://github.com/hilmirkarlsson/B-u-arkarfan" target="_blank">
+      <span class="sb-emoji">🛒</span><span class="sb-item-label">Búðarkarfan</span>
+      <span class="sb-dot" style="background:var(--pink)"></span>
+    </a>
+  </nav>
+
+  <div class="sb-foot">
+    <div class="sb-clock"><span id="sb-hm">--:--</span><span class="sb-sec" id="sb-s">--</span></div>
+    <div class="sb-dateline" id="sb-dt">—</div>
+    <div class="sb-weather" id="sb-wx">—</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <div class="day-wrap">
+    <div class="day-track"><div class="day-fill" id="dayfill" style="width:0%"></div></div>
+    <span class="day-pct" id="daypct">0%</span>
+  </div>
+
+  <div class="bento">
+
+    <!-- 1. CLOCK -->
+    <div class="w w-clock s2c">
+      <div class="greet" id="greet">—</div>
+      <div class="bigtime"><span id="bighm">--:--</span><span class="bigsec" id="bigs">--</span></div>
+      <div class="clock-meta">
+        <span class="clock-tag" id="fulldate">—</span>
+        <span class="clock-tag" id="wxline"><span class="spin">weather</span></span>
+      </div>
+    </div>
+
+    <!-- 2. NEXT EVENT -->
+    <div class="w">
+      <div class="chip" style="background:rgba(201,123,16,.1)">📅</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--amber)"></span>Next up</span></div>
+      <div id="next"><div class="spin">loading</div></div>
+    </div>
+
+    <!-- 3. HEALTH -->
+    <div class="w">
+      <div class="chip" style="background:rgba(13,172,114,.1)">💪</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--green)"></span>Health</span></div>
+      <div class="hrow"><span class="hlbl">Nutrition</span><div class="nutr"><button class="nb great" onclick="setN('great')">great</button><button class="nb fine" onclick="setN('fine')">fine</button><button class="nb ass" onclick="setN('ass')">ass</button></div></div>
+      <div class="hrow"><span class="hlbl">Gym</span><span class="hval tap" id="gym" onclick="togGym()">—</span></div>
+      <div class="hrow"><span class="hlbl">Weight</span><span class="hval tap" id="wt" onclick="editWt()">—</span></div>
+    </div>
+
+    <!-- 4. CALENDAR tall -->
+    <div class="w s2r">
+      <div class="chip" style="background:rgba(201,123,16,.1)">📅</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--amber)"></span>Calendar</span><span id="caldlbl" style="color:var(--amber)"></span></div>
+      <div id="cal-today"><div class="spin">loading calendar</div></div>
+      <div style="margin-top:.9rem">
+        <div class="wl" style="margin-bottom:.35rem"><span>This week</span></div>
+        <div id="cal-week"><div class="spin">loading</div></div>
+      </div>
+    </div>
+
+    <!-- 5. GOALS tall -->
+    <div class="w s2r">
+      <div class="wl"><span><span class="wlp" style="background:var(--navy)"></span>Goals · this week</span></div>
+      <div class="gbar-row"><div class="gbar-track"><div class="gbar-fill" id="gbar" style="width:0%"></div></div><span class="gbar-pct" id="gpct">0/0</span></div>
+      <div id="goals"></div>
+      <button class="ghost-btn" onclick="addGoal()">+ add goal</button>
+    </div>
+
+    <!-- 6. MACROS 2col -->
+    <div class="w s2c">
+      <div class="chip" style="background:rgba(216,75,40,.08)">🥗</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--ember)"></span>Macros today</span><button class="ghost-btn" style="margin:0;font-size:.5rem" onclick="setTarget()">target: <span id="tgtlbl">2200</span> kcal</button></div>
+      <div class="mac-num" id="macnum">0</div>
+      <div class="mac-sub">kcal logged today</div>
+      <div class="mac-track"><div class="mac-fill" id="macbar" style="width:0%"></div></div>
+      <div class="mac-cols">
+        <div class="mac-col"><span class="mac-lbl">Calories</span><input class="mac-inp" type="number" id="mi-cal" placeholder="0" oninput="saveMacros()"></div>
+        <div class="mac-col"><span class="mac-lbl" style="color:var(--sky)">Protein g</span><input class="mac-inp" type="number" id="mi-pro" placeholder="0" oninput="saveMacros()"></div>
+        <div class="mac-col"><span class="mac-lbl" style="color:var(--amber)">Carbs g</span><input class="mac-inp" type="number" id="mi-carb" placeholder="0" oninput="saveMacros()"></div>
+      </div>
+    </div>
+
+    <!-- 7. GITHUB 2col -->
+    <div class="w s2c">
+      <div class="chip" style="background:rgba(12,32,64,.06)">🐙</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--soft)"></span>GitHub · hilmirkarlsson</span></div>
+      <div style="display:flex;gap:1.5rem;align-items:flex-start">
+        <div><div class="streak-wrap"><span class="streak-num" id="ghstreak">—</span><span class="streak-unit">day<br>streak</span></div></div>
+        <div style="flex:1;min-width:0"><div id="ghcommits"><div class="spin">loading commits</div></div><a class="gh-link" href="https://github.com/hilmirkarlsson" target="_blank">→ github.com/hilmirkarlsson</a></div>
+      </div>
+    </div>
+
+    <!-- 8. OBSIDIAN 2col -->
+    <div class="w s2c">
+      <div class="chip" style="background:rgba(77,101,216,.08)">🧠</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--indigo)"></span>Obsidian</span><span id="obs-dt" style="color:var(--muted);font-size:.52rem"></span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <div class="obs-sec-hd">Future goals</div>
+          <div id="obsgoals"></div>
+          <button class="ghost-btn" onclick="addObsGoal()" style="margin-top:.45rem">+ add</button>
+        </div>
+        <div>
+          <div class="obs-sec-hd">Quick capture</div>
+          <div class="obs-inp-row"><input class="obs-inp" id="obs-inp" type="text" placeholder="Capture a thought…" onkeydown="if(event.key==='Enter')sendInbox()"><button class="obs-send" onclick="sendInbox()">→</button></div>
+          <div class="obs-btns">
+            <a class="obs-btn p" id="obs-daily" href="#" target="_blank">📓 Daily note</a>
+            <a class="obs-btn s" href="obsidian://open?vault=Vault" target="_blank">Open vault</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. FINANCE 2col -->
+    <div class="w s2c">
+      <div class="chip" style="background:rgba(8,153,160,.08)">💰</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--teal)"></span>Finance</span><span style="font-size:.5rem;color:var(--muted)">tap to edit</span></div>
+      <div class="fin-grid">
+        <div class="fin-cell"><span class="fin-lbl">Balance</span><span class="fin-val" id="fin-bal" onclick="editFin('bal')">—</span></div>
+        <div class="fin-cell"><span class="fin-lbl">Spent this month</span><span class="fin-val" id="fin-spent" onclick="editFin('spent')">—</span></div>
+        <div class="fin-cell"><span class="fin-lbl">Monthly budget</span><span class="fin-val" id="fin-budget" onclick="editFin('budget')">—</span></div>
+        <div class="fin-cell"><span class="fin-lbl">Remaining</span><span class="fin-val" id="fin-rem">—</span><span class="fin-sub" id="fin-remsub"></span></div>
+      </div>
+      <div class="fin-track"><div class="fin-fill" id="fin-bar" style="width:0%"></div></div>
+      <a class="fin-open" href="../Finance/my-finance.html" target="_blank">Open Finance Dashboard →</a>
+    </div>
+
+    <!-- 10. PROJECTS 2col -->
+    <div class="w s2c">
+      <div class="chip" style="background:rgba(58,175,212,.1)">⚡</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--sky)"></span>Projects</span></div>
+      <div class="proj-grid">
+        <div>
+          <div class="proj"><div class="pdot a"></div><span class="pn">Isavia-Eftirlit</span><span class="ps">active</span></div>
+          <div class="proj"><div class="pdot a"></div><span class="pn">Telpurnar</span><span class="ps">active</span></div>
+          <div class="proj"><div class="pdot a"></div><span class="pn">macrostracker</span><span class="ps">active</span></div>
+          <div class="proj"><div class="pdot a"></div><span class="pn">Dashboard</span><span class="ps">building</span></div>
+        </div>
+        <div>
+          <div class="proj"><div class="pdot a"></div><span class="pn">Book Tracker</span><span class="ps">active</span></div>
+          <div class="proj"><div class="pdot p"></div><span class="pn">Audiobookshelf</span><span class="ps">paused</span></div>
+          <div class="proj"><div class="pdot d"></div><span class="pn">Búðarkarfan</span><span class="ps">done</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11. MILAN 2col -->
+    <div class="w s2c">
+      <div class="chip" style="background:rgba(196,56,144,.08)">🇮🇹</div>
+      <div class="wl"><span><span class="wlp" style="background:var(--pink)"></span>Milan Trip</span></div>
+      <div class="milan-hero">
+        <div class="milan-days" id="milan-days">—</div>
+        <div class="milan-unit">days<br>to go</div>
+      </div>
+      <div class="milan-sub">Milan · Genoa · Cinque Terre<br>10 days with family &amp; Þín</div>
+      <div class="milan-date">Departure · August 3, 2026 ✈️</div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+'use strict';
+const pad = n => String(n).padStart(2,'0');
+
+function tick() {
+  const n=new Date(), hm=pad(n.getHours())+':'+pad(n.getMinutes()), s=pad(n.getSeconds());
+  ['sb-hm','bighm'].forEach(id=>document.getElementById(id).textContent=hm);
+  ['sb-s','bigs'].forEach(id=>document.getElementById(id).textContent=s);
+  const h=n.getHours();
+  document.getElementById('greet').textContent=(h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening')+', Hilmir.';
+  const pct=(h*60+n.getMinutes())/(24*60)*100;
+  document.getElementById('dayfill').style.width=pct+'%';
+  document.getElementById('daypct').textContent=Math.round(pct)+'%';
+  updateCountdown();
+}
+tick(); setInterval(tick,1000);
+
+(function(){
+  const n=new Date();
+  const D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const y=n.getFullYear(),mo=pad(n.getMonth()+1),d=pad(n.getDate()),ds=y+'-'+mo+'-'+d;
+  document.getElementById('fulldate').textContent=D[n.getDay()]+' · '+n.getDate()+' '+M[n.getMonth()]+' '+y;
+  document.getElementById('sb-dt').textContent=D[n.getDay()].slice(0,3)+' '+n.getDate()+' '+M[n.getMonth()];
+  document.getElementById('caldlbl').textContent='· '+n.getDate()+' '+M[n.getMonth()];
+  document.getElementById('obs-dt').textContent=ds;
+  document.getElementById('obs-daily').href='obsidian://open?vault=Vault&file=Daily+Notes%2F'+ds;
+  document.getElementById('milan-days').textContent=Math.max(0,Math.ceil((new Date('2026-08-03T00:00:00')-n)/864e5));
+})();
+
+(async()=>{
+  try{
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=64.1355&longitude=-21.8954&current=temperature_2m,weather_code&timezone=Atlantic%2FReykjavik');
+    const d=await r.json();
+    const t=Math.round(d.current.temperature_2m);
+    const w={0:'clear sky',1:'mostly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'fog',51:'drizzle',53:'drizzle',55:'drizzle',61:'light rain',63:'rain',65:'heavy rain',71:'light snow',73:'snow',75:'heavy snow',80:'showers',81:'showers',82:'showers',95:'storm'}[String(d.current.weather_code)]||'—';
+    document.getElementById('wxline').textContent=t+'° · Reykjavík · '+w;
+    document.getElementById('sb-wx').textContent=t+'° · '+w;
+  }catch{ document.getElementById('wxline').textContent='Reykjavík'; }
+})();
+
+const ICAL='https://calendar.google.com/calendar/ical/hilmirkarlsson%40gmail.com/private-e7b30b79827f02af2531a0a678ad7a28/basic.ics';
+let evs=[];
+(async()=>{
+  try{
+    const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(ICAL));
+    evs=parseIcal(await r.text()); renderCal(); updateCountdown();
+  }catch{
+    document.getElementById('cal-today').innerHTML='<div class="ghost">Could not load calendar</div>';
+    document.getElementById('cal-week').innerHTML='';
+    document.getElementById('next').innerHTML='<div class="ghost">—</div>';
+  }
+})();
+
+function parseIcal(txt){
+  const out=[];
+  txt.split('BEGIN:VEVENT').slice(1).forEach(b=>{
+    const g=k=>{const m=b.match(new RegExp(k+'[^:\\r\\n]*:([^\\r\\n]+)'));return m?m[1].trim():'';};
+    const sum=g('SUMMARY'),dts=g('DTSTART');
+    if(!sum||!dts) return;
+    const s=idate(dts),allDay=dts.replace(/^[^:]+:/,'').length===8;
+    if(s) out.push({sum,s,allDay});
+  });
+  return out.sort((a,b)=>a.s-b.s);
+}
+function idate(raw){
+  const s=raw.replace(/^[^:]+:/,'');
+  if(s.length===8) return new Date(+s.slice(0,4),s.slice(4,6)-1,+s.slice(6,8));
+  const y=+s.slice(0,4),mo=s.slice(4,6)-1,d=+s.slice(6,8),h=+(s.slice(9,11)||0),mi=+(s.slice(11,13)||0);
+  return s.endsWith('Z')?new Date(Date.UTC(y,mo,d,h,mi)):new Date(y,mo,d,h,mi);
+}
+function ftime(d,a){return a?'all day':pad(d.getHours())+':'+pad(d.getMinutes());}
+function renderCal(){
+  const now=new Date(),d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const d1=new Date(d0.getTime()+864e5),d7=new Date(d0.getTime()+7*864e5);
+  const td=evs.filter(e=>e.s>=d0&&e.s<d1),wk=evs.filter(e=>e.s>=d1&&e.s<d7);
+  document.getElementById('cal-today').innerHTML=td.length
+    ?td.map(e=>`<div class="ev"><div class="ev-line" style="background:var(--amber)"></div><div class="ev-r"><div class="ev-t">${ftime(e.s,e.allDay)}</div><div class="ev-n">${e.sum}</div></div></div>`).join('')
+    :'<div class="ghost">Nothing scheduled today</div>';
+  if(!wk.length){document.getElementById('cal-week').innerHTML='<div class="ghost">Nothing else this week</div>';return;}
+  const byD={};
+  wk.forEach(e=>{const k=e.s.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});(byD[k]=byD[k]||[]).push(e);});
+  document.getElementById('cal-week').innerHTML=Object.entries(byD).map(([day,es])=>`<div class="wk-day"><div class="wk-hd">${day}</div>`+es.map(e=>`<div class="ev"><div class="ev-line" style="background:var(--dim)"></div><div class="ev-r"><div class="ev-t">${ftime(e.s,e.allDay)}</div><div class="ev-n">${e.sum}</div></div></div>`).join('')+'</div>').join('');
+}
+function updateCountdown(){
+  const el=document.getElementById('next');
+  if(!evs.length) return;
+  const now=new Date(),coming=evs.filter(e=>e.s>now&&!e.allDay);
+  if(!coming.length){el.innerHTML='<div class="ghost">Nothing coming up</div>';return;}
+  const nx=coming[0],diff=nx.s-now;
+  const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000);
+  el.innerHTML=`<div class="next-name">${nx.sum}</div><div class="next-at">${ftime(nx.s,false)}</div><div class="next-count">${h>0?h+'h '+pad(m)+'m':m+'m'}</div><div class="next-sub">until next event</div>`;
+}
+
+(async()=>{
+  try{
+    const r=await fetch('https://api.github.com/users/hilmirkarlsson/events/public?per_page=80');
+    const ev=await r.json(),pushes=ev.filter(e=>e.type==='PushEvent');
+    const days=new Set(pushes.map(e=>e.created_at.slice(0,10)));
+    let streak=0; const today=new Date();
+    for(let i=0;i<90;i++){const d=new Date(today);d.setDate(d.getDate()-i);if(days.has(d.toISOString().slice(0,10)))streak++;else if(i>0)break;}
+    document.getElementById('ghstreak').textContent=streak;
+    document.getElementById('ghcommits').innerHTML=pushes.slice(0,3).length?pushes.slice(0,3).map(e=>{const msg=(e.payload.commits&&e.payload.commits[0])?e.payload.commits[0].message.split('\n')[0]:'—';return`<div class="commit"><span class="commit-repo">${e.repo.name.split('/')[1]}</span><span class="commit-msg">${msg}</span><span class="commit-age">${ago(new Date(e.created_at))}</span></div>`;}).join(''):'<div class="ghost">No recent commits</div>';
+  }catch{document.getElementById('ghcommits').innerHTML='<div class="ghost">—</div>';document.getElementById('ghstreak').textContent='—';}
+})();
+function ago(d){const s=Math.floor((new Date()-d)/1000);if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+
+const HK='dash-h-'+new Date().toISOString().slice(0,10);
+const gh=()=>{try{return JSON.parse(localStorage.getItem(HK))||{};}catch{return{};}};
+const sh=d=>{try{localStorage.setItem(HK,JSON.stringify(d));}catch{}};
+function setN(v){const h=gh();h.nutr=v;sh(h);renderH();}
+function togGym(){const h=gh();h.gym=!h.gym;sh(h);renderH();}
+function editWt(){const h=gh();const v=prompt('Weight (kg):',h.wt||'84');if(v!==null&&v.trim()){h.wt=v.trim();sh(h);renderH();}}
+function renderH(){const h=gh();document.querySelectorAll('.nb').forEach(b=>b.classList.toggle('sel',b.classList.contains(h.nutr||'')));const g=document.getElementById('gym');g.textContent=h.gym?'✓ done':'tap to log';g.style.color=h.gym?'var(--green)':'var(--muted)';document.getElementById('wt').textContent=h.wt?h.wt+' kg':'—';}
+renderH();
+
+const MK='dash-m-'+new Date().toISOString().slice(0,10);
+const gm=()=>{try{return JSON.parse(localStorage.getItem(MK))||{};}catch{return{};}};
+const sm=d=>{try{localStorage.setItem(MK,JSON.stringify(d));}catch{}};
+function saveMacros(){const m=gm();m.cal=document.getElementById('mi-cal').value||'';m.pro=document.getElementById('mi-pro').value||'';m.carb=document.getElementById('mi-carb').value||'';sm(m);renderMacros();}
+function setTarget(){const v=prompt('Daily calorie target:',localStorage.getItem('dash-cal-target')||'2200');if(v&&+v>0){localStorage.setItem('dash-cal-target',v);renderMacros();}}
+function renderMacros(){
+  const m=gm();if(m.cal)document.getElementById('mi-cal').value=m.cal;if(m.pro)document.getElementById('mi-pro').value=m.pro;if(m.carb)document.getElementById('mi-carb').value=m.carb;
+  const cal=parseInt(m.cal)||0,target=parseInt(localStorage.getItem('dash-cal-target'))||2200;
+  const numEl=document.getElementById('macnum');numEl.textContent=cal.toLocaleString();numEl.className='mac-num'+(cal>target?' over':cal>target*.85?' near':'');
+  document.getElementById('tgtlbl').textContent=target.toLocaleString();
+  const bar=document.getElementById('macbar');bar.style.width=Math.min(100,(cal/target)*100)+'%';bar.className='mac-fill'+(cal>target*.85?' near':'');
+}
+renderMacros();
+
+const OGK='dash-obs-goals';
+const defOG=['Finish Software Engineering degree','Build and ship monetisable apps','Start a business','Read as much as possible'];
+const gog=()=>{try{return JSON.parse(localStorage.getItem(OGK))||defOG;}catch{return defOG;}};
+const sog=v=>{try{localStorage.setItem(OGK,JSON.stringify(v));}catch{}};
+function addObsGoal(){const t=prompt('New future goal:');if(!t||!t.trim())return;const g=gog();g.push(t.trim());sog(g);renderObs();}
+function renderObs(){document.getElementById('obsgoals').innerHTML=gog().map(g=>`<div class="obs-goal"><div class="obs-bul"></div><span class="obs-gtxt">${g}</span></div>`).join('');}
+renderObs();
+function sendInbox(){const inp=document.getElementById('obs-inp'),val=inp.value.trim();if(!val)return;const ts=new Date().toISOString().slice(0,16).replace('T',' ');window.open('obsidian://new?vault=Vault&file=0-Inbox%2FQuick-'+encodeURIComponent(ts.replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');inp.value='';}
+
+const FK='dash-finance';
+const gf=()=>{try{return JSON.parse(localStorage.getItem(FK))||{};}catch{return{};}};
+const sf=d=>{try{localStorage.setItem(FK,JSON.stringify(d));}catch{}};
+function editFin(field){const f=gf();const labels={bal:'Balance (ISK)',spent:'Spent this month (ISK)',budget:'Monthly budget (ISK)'};const v=prompt(labels[field]+':',f[field]||'');if(v!==null&&v.trim()){f[field]=v.replace(/[^0-9.]/g,'');sf(f);renderFin();}}
+function fmtISK(n){return n?Number(n).toLocaleString('is-IS')+' kr':'—';}
+function renderFin(){
+  const f=gf();document.getElementById('fin-bal').textContent=fmtISK(f.bal);document.getElementById('fin-spent').textContent=fmtISK(f.spent);document.getElementById('fin-budget').textContent=fmtISK(f.budget);
+  const spent=parseFloat(f.spent)||0,budget=parseFloat(f.budget)||0,rem=budget-spent;
+  const remEl=document.getElementById('fin-rem');remEl.textContent=budget?fmtISK(String(Math.abs(rem))):'—';remEl.className='fin-val'+(rem<0?' warn':budget?' good':'');
+  document.getElementById('fin-remsub').textContent=budget?(rem<0?'over budget':'remaining'):'';
+  const bar=document.getElementById('fin-bar');bar.style.width=budget?Math.min(100,(spent/budget)*100)+'%':'0%';bar.className='fin-fill'+(rem<0?' warn':'');
+}
+renderFin();
+
+const GK='dash-goals';
+const DEF=[{t:'Redesign Telpurnar theme',d:false},{t:'Push Isavia-Eftirlit',d:false},{t:'Start Personal Dashboard',d:true}];
+const gg2=()=>{try{return JSON.parse(localStorage.getItem(GK))||DEF;}catch{return DEF;}};
+const sg2=g=>{try{localStorage.setItem(GK,JSON.stringify(g));}catch{}};
+function togGoal(i){const g=gg2();g[i].d=!g[i].d;sg2(g);renderGoals();}
+function addGoal(){const t=prompt('New goal:');if(!t||!t.trim())return;const g=gg2();g.push({t:t.trim(),d:false});sg2(g);renderGoals();}
+function renderGoals(){
+  const goals=gg2(),done=goals.filter(g=>g.d).length;
+  document.getElementById('gbar').style.width=goals.length?(done/goals.length*100)+'%':'0%';
+  document.getElementById('gpct').textContent=done+'/'+goals.length;
+  document.getElementById('goals').innerHTML=goals.map((g,i)=>`<div class="goal"><div class="gbox ${g.d?'done':''}" onclick="togGoal(${i})" role="checkbox" tabindex="0"></div><span class="gtxt ${g.d?'done':''}">${g.t}</span></div>`).join('');
+}
+renderGoals();
+</script>
+</body>
+</html>
