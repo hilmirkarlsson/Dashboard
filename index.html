@@ -14,10 +14,10 @@
       --sky:      #3AAFD4;
       --sky-l:    #7DCFEA;
       --sky-g:    rgba(58,175,212,0.22);
-      --ice:      rgba(185,228,252,0.72);
-      --ice-h:    rgba(195,235,255,0.85);
-      --glass-b:  rgba(255,255,255,0.75);
-      --glass-bi: rgba(255,255,255,0.9);
+      --ice:      rgba(210,238,252,0.58);
+      --ice-h:    rgba(220,243,255,0.72);
+      --glass-b:  rgba(255,255,255,0.82);
+      --glass-bi: rgba(255,255,255,0.95);
       --green:    #0DAC72;
       --green-g:  rgba(13,172,114,0.2);
       --amber:    #C97B10;
@@ -64,14 +64,14 @@
     }
     .blob-1 {
       width: 850px; height: 850px;
-      background: radial-gradient(circle at center, rgba(90,185,245,0.75) 0%, rgba(140,215,252,0.5) 35%, transparent 70%);
+      background: radial-gradient(circle at center, rgba(90,185,245,0.5) 0%, rgba(140,215,252,0.28) 35%, transparent 70%);
       filter: blur(75px);
       top: -250px; left: -180px;
       animation: drift1 28s ease-in-out infinite alternate;
     }
     .blob-2 {
       width: 700px; height: 700px;
-      background: radial-gradient(circle at center, rgba(70,170,240,0.65) 0%, rgba(120,210,252,0.4) 40%, transparent 70%);
+      background: radial-gradient(circle at center, rgba(70,170,240,0.42) 0%, rgba(120,210,252,0.22) 40%, transparent 70%);
       filter: blur(80px);
       bottom: -180px; right: -120px;
       animation: drift2 34s ease-in-out infinite alternate;
@@ -99,18 +99,18 @@
     .sb {
       position: fixed; top:0; left:0;
       width: 220px; height: 100dvh;
-      background: rgba(185,228,252,0.65);
-      backdrop-filter: blur(28px) saturate(160%);
-      -webkit-backdrop-filter: blur(28px) saturate(160%);
-      border-right: 1.5px solid rgba(255,255,255,0.75);
+      background: rgba(215,238,252,0.52);
+      backdrop-filter: blur(28px) saturate(150%);
+      -webkit-backdrop-filter: blur(28px) saturate(150%);
+      border-right: 1.5px solid rgba(160,210,240,0.55);
       display: flex; flex-direction: column;
       z-index: 100;
-      box-shadow: 2px 0 24px rgba(30,100,180,0.13), inset -1px 0 0 rgba(255,255,255,0.5);
+      box-shadow: 2px 0 20px rgba(30,100,180,0.09), inset -1px 0 0 rgba(255,255,255,0.6);
     }
 
     .sb-brand {
       padding: 1.7rem 1.5rem 1.3rem;
-      border-bottom: 1px solid rgba(170,215,240,0.4);
+      border-bottom: 1px solid rgba(160,210,240,0.45);
     }
 
     .sb-avatar {
@@ -140,20 +140,24 @@
       color: var(--muted); padding: .9rem 1.5rem .35rem;
     }
 
-    .sb-nav { flex: 1; overflow-y: auto; padding-bottom: .5rem; }
+    .sb-nav { flex: 1; overflow-y: auto; padding: .3rem .65rem .5rem; }
 
     .sb-item {
-      display: flex; align-items: center; gap: .72rem;
-      padding: .54rem 1.1rem .54rem 1.5rem;
-      font-size: .87rem; font-weight: 400;
+      display: flex; align-items: center; gap: .7rem;
+      padding: .5rem .85rem;
+      font-size: .85rem; font-weight: 400;
       color: var(--soft); text-decoration: none;
-      margin: 0 .6rem;
-      border-radius: 10px;
-      transition: color .15s, background .15s;
+      margin-bottom: .28rem;
+      border-radius: 11px;
+      background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(160,210,240,0.45);
+      transition: color .15s, background .18s, border-color .18s, box-shadow .18s;
     }
     .sb-item:hover {
       color: var(--navy);
-      background: rgba(58,175,212,0.1);
+      background: rgba(255,255,255,0.75);
+      border-color: rgba(58,175,212,0.45);
+      box-shadow: 0 2px 10px rgba(30,100,180,0.09);
     }
 
     .sb-emoji { font-size: .95rem; width: 20px; text-align: center; flex-shrink: 0; }
@@ -162,8 +166,8 @@
 
     .sb-foot {
       padding: 1.2rem 1.5rem;
-      border-top: 1px solid rgba(170,215,240,0.4);
-      background: rgba(170,220,248,0.35);
+      border-top: 1px solid rgba(160,210,240,0.45);
+      background: rgba(210,238,252,0.4);
     }
 
     .sb-clock {
@@ -204,7 +208,7 @@
       background: var(--ice);
       backdrop-filter: blur(24px) saturate(160%);
       -webkit-backdrop-filter: blur(24px) saturate(160%);
-      border: 1.5px solid var(--glass-b);
+      border: 1.5px solid rgba(160,210,240,0.55);
       border-radius: 20px;
       padding: 1.15rem 1.3rem;
       position: relative; overflow: hidden;
