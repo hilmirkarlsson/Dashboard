@@ -230,26 +230,32 @@ function addObsGoal(){const t=prompt('New future goal:');if(!t||!t.trim())return
 function renderObs(){document.getElementById('obsgoals').innerHTML=gog().map(g=>`<div class="obs-fi"><div class="obs-fi-dot"></div><span class="obs-fi-txt">${g}</span></div>`).join('');}
 renderObs();
 
-/* ── FINANCE ───────────────────────────────────────── */
+/* ── FINANCE CORE ───────────────────────────────────── */
 const FK='dash-finance';
 const gf=()=>{try{return JSON.parse(localStorage.getItem(FK))||{};}catch{return{};}};
 const sf=d=>{try{localStorage.setItem(FK,JSON.stringify(d));}catch{}};
-function editFin(field){const f=gf();const labels={bal:'Balance (ISK)',spent:'Spent this month (ISK)',budget:'Monthly budget (ISK)'};const v=prompt(labels[field]+':',f[field]||'');if(v!==null&&v.trim()){f[field]=v.replace(/[^0-9.]/g,'');sf(f);renderFin();}}
+function editFin(field){editFinField(field);}
+function editFinField(field){
+  const f=gf();
+  const labels={bal:'Balance (kr)',spent:'Spent this month (kr)',budget:'Monthly budget (kr)',income:'Monthly income (kr)'};
+  const v=prompt((labels[field]||field)+':',f[field]||'');
+  if(v!==null&&v.trim()){f[field]=v.replace(/[^0-9.]/g,'');sf(f);renderFin();if(document.getElementById('panel-finance').classList.contains('active'))loadFinanceTab();}
+}
 function fmtISK(n){return n?Number(n).toLocaleString('is-IS')+' kr':'—';}
+function fmtISKShort(n){if(!n)return'0';const v=Number(n);return v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'k':String(Math.round(v));}
 function renderFin(){
   const f=gf();
-  document.getElementById('fin-bal').textContent=fmtISK(f.bal);
-  document.getElementById('fin-spent').textContent=fmtISK(f.spent);
-  document.getElementById('fin-budget').textContent=fmtISK(f.budget);
-  document.getElementById('stat-balance').textContent=fmtISK(f.bal);
+  const e=id=>document.getElementById(id);
+  if(e('fin-bal'))e('fin-bal').textContent=fmtISK(f.bal);
+  if(e('fin-spent'))e('fin-spent').textContent=fmtISK(f.spent);
+  if(e('fin-budget'))e('fin-budget').textContent=fmtISK(f.budget);
+  if(e('stat-balance'))e('stat-balance').textContent=fmtISK(f.bal);
   const spent=parseFloat(f.spent)||0,budget=parseFloat(f.budget)||0,rem=budget-spent;
-  const remEl=document.getElementById('fin-rem');
-  remEl.textContent=budget?fmtISK(String(Math.abs(rem))):'—';
-  remEl.className='fin-val'+(rem<0?' warn':budget?' good':'');
-  document.getElementById('fin-remsub').textContent=budget?(rem<0?'over budget':'remaining'):'';
-  const bar=document.getElementById('fin-bar');
-  bar.style.width=budget?Math.min(100,(spent/budget)*100)+'%':'0%';
-  bar.className='fin-fill'+(rem<0?' warn':'');
+  const remEl=e('fin-rem');
+  if(remEl){remEl.textContent=budget?fmtISK(String(Math.abs(rem))):'—';remEl.className='fin-val'+(rem<0?' warn':budget?' good':'');}
+  if(e('fin-remsub'))e('fin-remsub').textContent=budget?(rem<0?'over budget':'remaining'):'';
+  const bar=e('fin-bar');
+  if(bar){bar.style.width=budget?Math.min(100,(spent/budget)*100)+'%':'0%';bar.className='fin-fill'+(rem<0?' warn':'');}
 }
 renderFin();
 
@@ -298,12 +304,6 @@ function relTime(d) {
   if (diff < 2) return 'yesterday';
   if (diff < 8) return Math.floor(diff)+' days ago';
   return Math.floor(diff/7)+' weeks ago';
-}
-function fmtISKShort(n) {
-  if (!n) return '—';
-  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
-  if (n >= 1e3) return Math.round(n/1e3)+'k';
-  return String(n);
 }
 
 /* server health check */
@@ -493,54 +493,224 @@ function saveZeppSheet() {
 }
 
 /* ── FINANCE TAB ────────────────────────────────────── */
-function loadFinanceTab() {
-  const f = gf();
-  ['fp-bal','fp-bal2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=fmtISK(f.bal); });
-  ['fp-spent','fp-spent2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=fmtISK(f.spent); });
-  ['fp-budget','fp-budget2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=fmtISK(f.budget); });
-  const spent=parseFloat(f.spent)||0, budget=parseFloat(f.budget)||0, rem=budget-spent;
-  ['fp-rem','fp-rem2'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.textContent=budget?fmtISK(String(Math.abs(rem))):'—'; el.className='stat-val'+(rem<0?' warn':budget?' good':''); }});
-  const sub=document.getElementById('fp-rem-sub'); if(sub) sub.textContent=budget?(rem<0?'over budget':'remaining'):'';
-  const bar=document.getElementById('fp-bar2'); if(bar){ bar.style.width=budget?Math.min(100,(spent/budget)*100)+'%':'0%'; bar.className='fin-fill'+(rem<0?' warn':''); }
-  archiveCurrentMonth();
-  renderFinChart();
-}
-function editFin2(field) { editFin(field); loadFinanceTab(); }
-function getMonthlyFin() { try{return JSON.parse(localStorage.getItem('dash-finance-monthly'))||[];}catch{return[];} }
-function saveMonthlyFin(arr) { try{localStorage.setItem('dash-finance-monthly',JSON.stringify(arr));}catch{} }
-function archiveCurrentMonth() {
-  const f=gf(); if(!f.spent) return;
+const FIN_CATS=['Housing','Food','Transport','Subscriptions','Shopping','Other'];
+const FIN_CAT_COLORS=['#C16A41','#5E7E63','#C99A3F','#7C8FA6','#A86B6B','#CDBBA8'];
+const getFinCats=()=>{try{return JSON.parse(localStorage.getItem('dash-finance-cats'))||{};}catch{return{};}};
+const saveFinCats=d=>{try{localStorage.setItem('dash-finance-cats',JSON.stringify(d));}catch{}};
+const getFinCatBudgets=()=>{try{return JSON.parse(localStorage.getItem('dash-finance-cat-budgets'))||{};}catch{return{};}};
+const saveFinCatBudgets=d=>{try{localStorage.setItem('dash-finance-cat-budgets',JSON.stringify(d));}catch{}};
+const getFinTxns=()=>{try{return JSON.parse(localStorage.getItem('dash-finance-txns'))||[];}catch{return[];}};
+const saveFinTxns=arr=>{try{localStorage.setItem('dash-finance-txns',JSON.stringify(arr));}catch{}};
+const getFinGoals=()=>{try{return JSON.parse(localStorage.getItem('dash-finance-goals'))||[];}catch{return[];}};
+const saveFinGoals=arr=>{try{localStorage.setItem('dash-finance-goals',JSON.stringify(arr));}catch{}};
+const getMonthlyFin=()=>{try{return JSON.parse(localStorage.getItem('dash-finance-monthly'))||[];}catch{return[];}};
+const saveMonthlyFin=arr=>{try{localStorage.setItem('dash-finance-monthly',JSON.stringify(arr));}catch{}};
+
+function archiveCurrentMonth(){
+  const f=gf();if(!f.spent)return;
   const cur=new Date().toISOString().slice(0,7);
   let arr=getMonthlyFin();
   const idx=arr.findIndex(m=>m.m===cur);
-  if(idx>=0) arr[idx].spent=parseFloat(f.spent)||0;
+  if(idx>=0)arr[idx].spent=parseFloat(f.spent)||0;
   else arr.push({m:cur,spent:parseFloat(f.spent)||0});
   arr=arr.sort((a,b)=>a.m.localeCompare(b.m)).slice(-8);
   saveMonthlyFin(arr);
 }
-function renderFinChart() {
-  const svg=document.getElementById('fin-chart-svg'); if(!svg) return;
-  const arr=getMonthlyFin(); if(!arr.length){ svg.innerHTML='<text x="170" y="70" text-anchor="middle" fill="#9ca3af" font-size="13" font-family="Plus Jakarta Sans">No data yet — save a month to start chart</text>'; return; }
-  const last5=arr.slice(-5);
+
+function loadFinanceTab(){
+  const f=gf();
+  const e=id=>document.getElementById(id);
+  const spent=parseFloat(f.spent)||0,budget=parseFloat(f.budget)||0,rem=budget-spent;
+  if(e('fp-bal'))e('fp-bal').textContent=fmtISK(f.bal);
+  if(e('fp-spent'))e('fp-spent').textContent=fmtISK(f.spent);
+  if(e('fp-budget'))e('fp-budget').textContent=fmtISK(f.budget);
+  const remEl=e('fp-rem');
+  if(remEl){remEl.textContent=budget?fmtISK(String(Math.abs(rem))):'—';remEl.className='fin2-sc-val'+(rem<0?' warn':budget?' good':'');}
+  if(e('fp-rem-sub'))e('fp-rem-sub').textContent=budget?(rem<0?'over budget':'remaining'):'';
+  if(budget){
+    const pct=Math.round((spent/budget)*100);
+    if(e('fp-spent-sub'))e('fp-spent-sub').textContent=pct+'% of budget';
+    if(e('fp-budget-sub'))e('fp-budget-sub').textContent=pct+'% used · '+new Date().getDate()+' days in';
+  }
+  archiveCurrentMonth();
+  renderFinMonthlyBars();
+  renderFinIncomeVsExp(f,spent);
+  renderFinDonut();
+  renderFinCatBudgets();
+  renderFinTxns();
+  renderFinGoals();
+}
+
+function renderFinMonthlyBars(){
+  const el=document.getElementById('fp-monthly-bars');if(!el)return;
+  const arr=getMonthlyFin();
+  if(!arr.length){el.innerHTML='<div class="ghost" style="margin:auto;align-self:center;padding:20px 0;">No data yet — save a month to start</div>';return;}
   const curM=new Date().toISOString().slice(0,7);
-  const maxV=Math.max(...last5.map(m=>m.spent),1);
-  const W=60, gap=8, startX=10, chartH=90, baseY=115;
+  const maxV=Math.max(...arr.map(m=>m.spent),1);
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  let html='';
-  last5.forEach((m,i)=>{
-    const x=startX+i*(W+gap);
-    const barH=Math.max(4,Math.round((m.spent/maxV)*chartH));
-    const y=baseY-barH;
+  el.innerHTML=arr.map(m=>{
     const cur=m.m===curM;
-    const fill=cur?'#111827':'#e5e7eb';
-    const textFill=cur?'#111827':'#9ca3af';
+    const h=Math.max(10,Math.round((m.spent/maxV)*100));
     const mon=MN[parseInt(m.m.slice(5,7))-1];
-    const lbl=fmtISKShort(m.spent);
-    html+=`<rect x="${x}" y="${y}" width="${W}" height="${barH}" rx="5" fill="${fill}"/>`;
-    html+=`<text x="${x+W/2}" y="${y-5}" text-anchor="middle" fill="${textFill}" font-size="10" font-family="Plus Jakarta Sans,sans-serif">${lbl}</text>`;
-    html+=`<text x="${x+W/2}" y="130" text-anchor="middle" fill="${textFill}" font-size="11" font-family="Plus Jakarta Sans,sans-serif" font-weight="${cur?700:500}">${mon}</text>`;
-  });
-  svg.innerHTML=html;
+    return '<div class="fin2-bar-col">'
+      +'<div style="font:500 10px \'Plus Jakarta Sans\',sans-serif;color:'+(cur?'#C16A41':'#9ca3af')+';text-align:center;white-space:nowrap;">'+fmtISKShort(m.spent)+'</div>'
+      +'<div class="fin2-bar-col-bar" style="height:'+h+'px;background:'+(cur?'#C16A41':'#e5e7eb')+'"></div>'
+      +'<div class="fin2-bar-col-lbl'+(cur?' cur':'')+'">'+mon+'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function renderFinIncomeVsExp(f,spent){
+  const e=id=>document.getElementById(id);
+  const income=parseFloat(f.income)||0;
+  if(e('fp-income'))e('fp-income').textContent=income?fmtISK(f.income):'tap to set';
+  if(e('fp-expenses-vs'))e('fp-expenses-vs').textContent=spent?fmtISK(String(spent)):'—';
+  const maxV=Math.max(income,spent,1);
+  if(e('fp-income-bar'))e('fp-income-bar').style.width=income?Math.round((income/maxV)*100)+'%':'4%';
+  if(e('fp-expenses-bar'))e('fp-expenses-bar').style.width=spent?Math.round((spent/maxV)*100)+'%':'0%';
+  const net=income-spent;
+  const netEl=e('fp-net');
+  if(netEl){netEl.textContent=income?(net>=0?'+':'')+fmtISK(String(Math.abs(net))):'—';netEl.className='fin2-net-val'+(net<0?' neg':'');}
+  const rateEl=e('fp-savings-rate');
+  if(rateEl)rateEl.textContent=(income&&net>0)?Math.round((net/income)*100)+'% savings rate this month':'';
+}
+
+function renderFinDonut(){
+  const cats=getFinCats();
+  const total=FIN_CATS.reduce((s,c)=>s+(parseFloat(cats[c])||0),0);
+  const arcsEl=document.getElementById('fp-donut-arcs');
+  const legendEl=document.getElementById('fp-cat-legend');
+  const totalEl=document.getElementById('fp-donut-total');
+  if(totalEl)totalEl.textContent=total?fmtISKShort(total)+'kr':'—';
+  if(!arcsEl||!legendEl)return;
+  const circ=2*Math.PI*54;
+  let offset=0;
+  let arcsHtml='<circle cx="66" cy="66" r="54" fill="none" stroke="#eef0f2" stroke-width="20"/>';
+  if(total){
+    FIN_CATS.forEach((cat,i)=>{
+      const v=parseFloat(cats[cat])||0;if(!v)return;
+      const dash=(v/total)*circ;
+      arcsHtml+=`<circle cx="66" cy="66" r="54" fill="none" stroke="${FIN_CAT_COLORS[i]}" stroke-width="20" stroke-dasharray="${dash.toFixed(1)} ${(circ-dash).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}"/>`;
+      offset+=dash;
+    });
+  }
+  arcsEl.innerHTML=arcsHtml;
+  legendEl.innerHTML=FIN_CATS.map((cat,i)=>{
+    const v=parseFloat(cats[cat])||0;
+    return '<div style="display:flex;align-items:center;gap:8px;font:500 12.5px \'Plus Jakarta Sans\',sans-serif;color:#374151;">'
+      +'<span style="width:9px;height:9px;border-radius:3px;background:'+FIN_CAT_COLORS[i]+';flex:none;"></span>'
+      +cat
+      +'<span style="margin-left:auto;color:#6b7280;font-variant-numeric:tabular-nums;font-size:12px;">'+fmtISK(String(v))+'</span>'
+    +'</div>';
+  }).join('');
+}
+
+function editFinCats(){
+  const cats=getFinCats();
+  for(const cat of FIN_CATS){
+    const v=prompt(cat+' spending (kr):',cats[cat]||'');
+    if(v===null)break;
+    if(v.trim())cats[cat]=v.replace(/[^0-9.]/g,'');
+  }
+  saveFinCats(cats);renderFinDonut();renderFinCatBudgets();
+}
+
+function renderFinCatBudgets(){
+  const el=document.getElementById('fp-cat-budget-bars');if(!el)return;
+  const cats=getFinCats(),budgets=getFinCatBudgets();
+  el.innerHTML=FIN_CATS.map((cat,i)=>{
+    const spent=parseFloat(cats[cat])||0,budget=parseFloat(budgets[cat])||0;
+    const pct=budget?Math.min(100,Math.round((spent/budget)*100)):0;
+    const color=pct>=90?'#ef4444':pct>=70?'#C99A3F':'#5E7E63';
+    return '<div class="fin2-budget-bar-row">'
+      +'<div class="fin2-budget-bar-hd" onclick="editFinCatBudgetItem(\''+cat+'\')">'
+      +'<span class="fin2-budget-bar-name" style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:2px;background:'+FIN_CAT_COLORS[i]+';flex:none;"></span>'+cat+'</span>'
+      +'<span style="color:#9ca3af;font-size:12px;font-variant-numeric:tabular-nums;">'+fmtISK(String(spent))+' / '+(budget?fmtISK(String(budget)):'set budget')+'</span>'
+      +'</div>'
+      +'<div class="fin2-budget-bar-track"><div class="fin2-budget-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'</div>';
+  }).join('');
+}
+
+function editFinCatBudgetItem(cat){
+  const budgets=getFinCatBudgets();
+  const v=prompt(cat+' budget (kr):',budgets[cat]||'');
+  if(v!==null&&v.trim()){budgets[cat]=v.replace(/[^0-9.]/g,'');saveFinCatBudgets(budgets);renderFinCatBudgets();}
+}
+
+function editFinCatBudgets(){
+  const budgets=getFinCatBudgets();
+  for(const cat of FIN_CATS){
+    const v=prompt(cat+' budget (kr):',budgets[cat]||'');
+    if(v===null)break;
+    if(v.trim())budgets[cat]=v.replace(/[^0-9.]/g,'');
+  }
+  saveFinCatBudgets(budgets);renderFinCatBudgets();
+}
+
+function renderFinTxns(){
+  const el=document.getElementById('fp-txns');if(!el)return;
+  const txns=getFinTxns();
+  if(!txns.length){el.innerHTML='<div class="ghost" style="padding:16px 20px;">No transactions yet — tap + Add</div>';return;}
+  el.innerHTML=txns.slice(0,10).map((t,i)=>{
+    const isInc=t.amount>0;
+    const bg=isInc?'#e6ede5':'#f3f4f6';
+    const amtStr=(isInc?'+':'')+fmtISK(String(Math.abs(t.amount)));
+    return '<div class="fin2-txn">'
+      +'<div class="fin2-txn-icon" style="background:'+bg+'">'+t.emoji+'</div>'
+      +'<div class="fin2-txn-info"><div class="fin2-txn-name">'+t.name+'</div><div class="fin2-txn-meta">'+t.category+' · '+t.date+'</div></div>'
+      +'<div class="fin2-txn-amount'+(isInc?' income':'')+'">'+amtStr+'</div>'
+      +'<span class="fin2-txn-del" onclick="delFinTxn('+i+')" title="Delete">×</span>'
+    +'</div>';
+  }).join('');
+}
+
+function addFinTxn(){
+  const name=prompt('Transaction name:','');if(!name)return;
+  const amtStr=prompt('Amount (positive = income, negative = expense, e.g. -5000):','');if(amtStr===null)return;
+  const cat=prompt('Category (Housing / Food / Transport / Subscriptions / Shopping / Other / Income):','Other');
+  const emoji=prompt('Emoji icon:','💰');
+  const date=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const txns=getFinTxns();
+  txns.unshift({name,amount:parseFloat(amtStr.replace(/[^0-9.-]/g,''))||0,category:cat||'Other',emoji:emoji||'💰',date});
+  saveFinTxns(txns.slice(0,20));renderFinTxns();
+}
+
+function delFinTxn(i){
+  const txns=getFinTxns();txns.splice(i,1);saveFinTxns(txns);renderFinTxns();
+}
+
+function renderFinGoals(){
+  const el=document.getElementById('fp-goals');if(!el)return;
+  const goals=getFinGoals();
+  if(!goals.length){el.innerHTML='<div class="ghost">No goals yet — tap + Add goal</div>';return;}
+  el.innerHTML=goals.map((g,i)=>{
+    const pct=g.target?Math.min(100,Math.round((g.saved/g.target)*100)):0;
+    return '<div class="fin2-goal-row">'
+      +'<div class="fin2-goal-hd" onclick="editFinGoalItem('+i+')">'
+      +'<span>'+g.name+'</span>'
+      +'<span style="color:#9ca3af;font-size:12px;font-variant-numeric:tabular-nums;">'+fmtISK(String(g.saved))+' / '+fmtISK(String(g.target))+'</span>'
+      +'</div>'
+      +'<div class="fin2-goal-track"><div class="fin2-goal-fill" style="width:'+pct+'%"></div></div>'
+    +'</div>';
+  }).join('');
+}
+
+function addFinGoal(){
+  const name=prompt('Goal name (e.g. Emergency fund):','');if(!name)return;
+  const saved=prompt('Saved so far (kr):','0');if(saved===null)return;
+  const target=prompt('Target amount (kr):','');if(!target)return;
+  const goals=getFinGoals();
+  goals.push({name,saved:parseFloat(saved.replace(/[^0-9.]/g,''))||0,target:parseFloat(target.replace(/[^0-9.]/g,''))||0});
+  saveFinGoals(goals);renderFinGoals();
+}
+
+function editFinGoalItem(i){
+  const goals=getFinGoals();const g=goals[i];
+  const action=prompt(g.name+'\n\n1. Update saved amount\n2. Delete this goal\n\nEnter 1 or 2:','1');
+  if(action==='2'){goals.splice(i,1);saveFinGoals(goals);renderFinGoals();return;}
+  const saved=prompt(g.name+' — saved so far (kr):',g.saved||'');
+  if(saved!==null&&saved.trim()){g.saved=parseFloat(saved.replace(/[^0-9.]/g,''))||0;saveFinGoals(goals);renderFinGoals();}
 }
 
 /* ── PROJECTS TAB ───────────────────────────────────── */

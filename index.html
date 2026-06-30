@@ -394,37 +394,101 @@
 
     <!-- ═══════════════ FINANCE PANEL ═══════════════ -->
     <section id="panel-finance" class="tab-panel">
-      <!-- stat row (reuses finance data) -->
-      <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
-        <div class="stat"><div class="stat-lbl">Balance</div><div class="stat-val" id="fp-bal">—</div><div class="stat-sub">current</div></div>
-        <div class="stat"><div class="stat-lbl">Spent this month</div><div class="stat-val" id="fp-spent">—</div><div class="stat-sub" id="fp-spent-sub">of budget</div></div>
-        <div class="stat"><div class="stat-lbl">Monthly budget</div><div class="stat-val" id="fp-budget">—</div><div class="stat-sub">set</div></div>
-        <div class="stat"><div class="stat-lbl">Remaining</div><div class="stat-val" id="fp-rem">—</div><div class="stat-sub" id="fp-rem-sub"></div></div>
-      </div>
-      <div class="p23">
-        <!-- chart card -->
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div class="card-lbl" style="margin:0;">Monthly Spending</div>
-            <button class="btn btn-lt" style="padding:6px 14px;font-size:12px;" onclick="archiveCurrentMonth()">Save this month</button>
-          </div>
-          <svg id="fin-chart-svg" class="fc-wrap" viewBox="0 0 340 140" style="width:100%;height:auto;overflow:visible;"></svg>
-          <div style="font-size:12px;color:#9ca3af;margin-top:12px;">Bar = monthly spending. Dark bar = current month.</div>
+
+      <!-- 4 stat cards -->
+      <div class="fin2-stat-row">
+        <div class="fin2-sc">
+          <div class="fin2-sc-lbl">Balance</div>
+          <div class="fin2-sc-val tap" id="fp-bal" onclick="editFinField('bal')">—</div>
+          <div class="fin2-sc-sub">tap to edit</div>
         </div>
-        <!-- edit card -->
-        <div class="card">
-          <div class="card-lbl">Quick Edit</div>
-          <div class="fin-grid" style="margin-bottom:16px;">
-            <div class="fin-cell"><span class="fin-lbl">Balance</span><span class="fin-val" id="fp-bal2" onclick="editFin2('bal')" style="cursor:pointer;">—</span></div>
-            <div class="fin-cell"><span class="fin-lbl">Spent</span><span class="fin-val" id="fp-spent2" onclick="editFin2('spent')" style="cursor:pointer;">—</span></div>
-            <div class="fin-cell"><span class="fin-lbl">Budget</span><span class="fin-val" id="fp-budget2" onclick="editFin2('budget')" style="cursor:pointer;">—</span></div>
-            <div class="fin-cell"><span class="fin-lbl">Remaining</span><span class="fin-val" id="fp-rem2">—</span></div>
-          </div>
-          <div class="fin-track"><div class="fin-fill" id="fp-bar2" style="width:0%"></div></div>
-          <div style="font-size:12px;color:#9ca3af;margin-top:8px;">Tap any value to edit</div>
+        <div class="fin2-sc">
+          <div class="fin2-sc-lbl">Spent this month</div>
+          <div class="fin2-sc-val tap" id="fp-spent" onclick="editFinField('spent')">—</div>
+          <div class="fin2-sc-sub" id="fp-spent-sub">of budget</div>
+        </div>
+        <div class="fin2-sc">
+          <div class="fin2-sc-lbl">Monthly budget</div>
+          <div class="fin2-sc-val tap" id="fp-budget" onclick="editFinField('budget')">—</div>
+          <div class="fin2-sc-sub" id="fp-budget-sub">tap to edit</div>
+        </div>
+        <div class="fin2-sc">
+          <div class="fin2-sc-lbl">Remaining</div>
+          <div class="fin2-sc-val" id="fp-rem">—</div>
+          <div class="fin2-sc-sub" id="fp-rem-sub"></div>
         </div>
       </div>
-      <a class="full-cta" href="../Finance/my-finance.html" target="_blank">→ Open Finance Dashboard</a>
+
+      <!-- Row: Monthly spending + Income vs Expenses -->
+      <div class="fin2-row fin2-row-6040">
+        <div class="card">
+          <div class="fin2-card-hd">
+            <div class="fin2-card-lbl">Monthly Spending</div>
+            <button class="btn btn-lt" style="font-size:11px;padding:5px 12px;" onclick="archiveCurrentMonth();loadFinanceTab()">Save this month</button>
+          </div>
+          <div class="fin2-monthly-bars" id="fp-monthly-bars"></div>
+          <div class="fin2-hint">Bar = monthly spending · Dark bar = current month</div>
+        </div>
+        <div class="card">
+          <div class="fin2-card-lbl">Income vs Expenses</div>
+          <div class="fin2-vs-list">
+            <div>
+              <div class="fin2-vs-hd"><span class="fin2-vs-label">Income</span><span class="fin2-vs-amount green tap" id="fp-income" onclick="editFinField('income')">tap to set</span></div>
+              <div class="fin2-prog-track"><div class="fin2-prog-fill green" id="fp-income-bar" style="width:100%;"></div></div>
+            </div>
+            <div>
+              <div class="fin2-vs-hd"><span class="fin2-vs-label">Expenses</span><span class="fin2-vs-amount" id="fp-expenses-vs">—</span></div>
+              <div class="fin2-prog-track"><div class="fin2-prog-fill terracotta" id="fp-expenses-bar" style="width:0%;"></div></div>
+            </div>
+          </div>
+          <div class="fin2-net-divider"></div>
+          <div class="fin2-net-row">
+            <span class="fin2-net-label">Net saved</span>
+            <span class="fin2-net-val" id="fp-net">—</span>
+          </div>
+          <div class="fin2-hint" id="fp-savings-rate"></div>
+        </div>
+      </div>
+
+      <!-- Row: Category donut + Recent transactions -->
+      <div class="fin2-row fin2-row-4060">
+        <div class="card">
+          <div class="fin2-card-lbl">Spending by Category</div>
+          <div class="fin2-donut-wrap">
+            <svg id="fp-donut-svg" width="132" height="132" viewBox="0 0 132 132" style="flex:none;">
+              <g id="fp-donut-arcs" transform="rotate(-90 66 66)">
+                <circle cx="66" cy="66" r="54" fill="none" stroke="#eef0f2" stroke-width="20"/>
+              </g>
+              <text x="66" y="62" text-anchor="middle" id="fp-donut-total" style="font:700 18px 'Plus Jakarta Sans',sans-serif;fill:#111827">—</text>
+              <text x="66" y="79" text-anchor="middle" style="font:600 9px 'Plus Jakarta Sans',sans-serif;fill:#9ca3af;letter-spacing:.07em">SPENT</text>
+            </svg>
+            <div id="fp-cat-legend" style="flex:1;display:flex;flex-direction:column;gap:9px;"></div>
+          </div>
+          <button class="ghost-btn" style="margin-top:12px;" onclick="editFinCats()">Edit category amounts</button>
+        </div>
+        <div class="card" style="padding:0;">
+          <div style="padding:18px 20px 12px;display:flex;justify-content:space-between;align-items:center;">
+            <div class="fin2-card-lbl" style="margin:0;">Recent Transactions</div>
+            <button class="btn btn-dk" style="font-size:11px;padding:5px 12px;" onclick="addFinTxn()">+ Add</button>
+          </div>
+          <div id="fp-txns"></div>
+        </div>
+      </div>
+
+      <!-- Row: Budget by category + Savings goals -->
+      <div class="fin2-row">
+        <div class="card">
+          <div class="fin2-card-lbl">Budget by Category</div>
+          <div id="fp-cat-budget-bars" style="display:flex;flex-direction:column;gap:13px;"></div>
+          <button class="ghost-btn" style="margin-top:14px;" onclick="editFinCatBudgets()">Edit budgets</button>
+        </div>
+        <div class="card">
+          <div class="fin2-card-lbl">Savings Goals</div>
+          <div id="fp-goals" style="display:flex;flex-direction:column;gap:13px;"></div>
+          <button class="ghost-btn" style="margin-top:14px;" onclick="addFinGoal()">+ Add goal</button>
+        </div>
+      </div>
+
     </section><!-- /panel-finance -->
 
     <!-- ═══════════════ PROJECTS PANEL ═══════════════ -->
