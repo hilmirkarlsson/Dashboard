@@ -33,6 +33,34 @@ async function latestFileIn(folderId) {
   return res.data.files?.[0] || null;
 }
 
+// Find the N most recently modified files in a Drive folder
+async function recentFilesIn(folderId, limit) {
+  const drive = getDrive();
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
+    orderBy: 'modifiedTime desc',
+    pageSize: limit,
+    fields: 'files(id, name, modifiedTime)',
+  });
+  return res.data.files || [];
+}
+
+// Newest per-entry date found inside an export's metrics. Drive's
+// modifiedTime metadata isn't a reliable proxy for "which file has the
+// freshest health data" (multiple automations/widgets can touch the same
+// folder), so pick the candidate file by its actual content instead.
+function latestContentDate(d) {
+  if (typeof d.steps !== 'undefined' || typeof d.restingHR !== 'undefined') return null;
+  const metrics = d?.data?.metrics || d?.metrics || [];
+  let max = null;
+  metrics.forEach(m => {
+    (m.data || []).forEach(e => {
+      if (typeof e.date === 'string' && (!max || e.date > max)) max = e.date;
+    });
+  });
+  return max;
+}
+
 // Download a file's content by Drive file ID
 async function downloadFile(fileId) {
   const drive = getDrive();
@@ -185,14 +213,26 @@ http.createServer(async (req, res) => {
   try {
     // GET /api/health-json
     if (pn === '/api/health-json') {
-      const file = await latestFileIn(HEALTH_FOLDER_ID);
-      if (!file) return reply(res, 404, 'No health data yet');
-      const raw = await downloadFile(file.id);
-      const data = normalizeHealthData(JSON.parse(raw));
+      const candidates = await recentFilesIn(HEALTH_FOLDER_ID, 5);
+      if (!candidates.length) return reply(res, 404, 'No health data yet');
+
+      let best = null, bestParsed = null, bestDate = null;
+      for (const file of candidates) {
+        let parsed;
+        try { parsed = JSON.parse(await downloadFile(file.id)); }
+        catch (e) { continue; }
+        const contentDate = latestContentDate(parsed);
+        if (!best || (contentDate && (!bestDate || contentDate > bestDate))) {
+          best = file; bestParsed = parsed; bestDate = contentDate;
+        }
+      }
+      if (!best) return reply(res, 404, 'No health data yet');
+
+      const data = normalizeHealthData(bestParsed);
       // Report when the export file itself was last updated, not when this
       // request happened — otherwise a stale export still says "synced
       // just now" and hides that no new data has actually landed.
-      data.synced = file.modifiedTime || data.synced;
+      data.synced = best.modifiedTime || data.synced;
       return jsonReply(res, data);
     }
 
