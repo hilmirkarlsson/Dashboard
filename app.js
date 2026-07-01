@@ -829,28 +829,205 @@ function archiveCurrentMonth(){
   saveMonthlyFin(arr);
 }
 
+/* ── FINANCE TAB — live from spreadsheet (/api/finance-json) ───────────
+   Data is parsed server-side from "Hilmir Finance vN.xlsx" in the vault and
+   fetched here as JSON; charts are rendered with Chart.js. */
+let _finData=null, _finRendered=false;
+const finCharts={};
+
 function loadFinanceTab(){
-  const f=gf();
-  const e=id=>document.getElementById(id);
-  const spent=parseFloat(f.spent)||0,budget=parseFloat(f.budget)||0,rem=budget-spent;
-  if(e('fp-bal'))e('fp-bal').textContent=fmtISK(f.bal);
-  if(e('fp-spent'))e('fp-spent').textContent=fmtISK(f.spent);
-  if(e('fp-budget'))e('fp-budget').textContent=fmtISK(f.budget);
-  const remEl=e('fp-rem');
-  if(remEl){remEl.textContent=budget?fmtISK(String(Math.abs(rem))):'—';remEl.className='fin2-sc-val'+(rem<0?' warn':budget?' good':'');}
-  if(e('fp-rem-sub'))e('fp-rem-sub').textContent=budget?(rem<0?'over budget':'remaining'):'';
-  if(budget){
-    const pct=Math.round((spent/budget)*100);
-    if(e('fp-spent-sub'))e('fp-spent-sub').textContent=pct+'% of budget';
-    if(e('fp-budget-sub'))e('fp-budget-sub').textContent=pct+'% used · '+new Date().getDate()+' days in';
-  }
-  archiveCurrentMonth();
-  renderFinMonthlyBars();
-  renderFinIncomeVsExp(f,spent);
-  renderFinDonut();
-  renderFinCatBudgets();
-  renderFinTxns();
-  renderFinGoals();
+  wireFinSubnav();
+  if(_finData){ if(!_finRendered) finRenderAll(); return; }
+  fetch(API+'/api/finance-json').then(r=>{if(!r.ok)throw new Error('no data');return r.json();})
+    .then(d=>{ _finData=d; document.getElementById('fin-source').textContent=d.source||'spreadsheet';
+      document.getElementById('fin-loading').style.display='none';
+      document.getElementById('fin-views').style.display='block';
+      finRenderAll(); })
+    .catch(()=>{ document.getElementById('fin-loading').innerHTML='<span class="ghost">Couldn\'t load finance data. Make sure the server is running and the workbook is shared.</span>'; });
+}
+
+function wireFinSubnav(){
+  const nav=document.getElementById('fin-tabs');
+  if(!nav||nav._wired)return; nav._wired=true;
+  nav.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-fv]'); if(!b)return;
+    nav.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));
+    document.querySelectorAll('#fin-views .fv').forEach(v=>v.classList.toggle('active',v.id==='fv-'+b.dataset.fv));
+  });
+}
+
+const finFmt=n=>{ if(n===null||n===undefined)return '—'; if(typeof n!=='number')return n;
+  return Math.round(n).toLocaleString('is-IS').replace(/,/g,'.')+' kr.'; };
+const finPlain=n=>{ if(n===null||n===undefined)return '—'; return Math.round(n).toLocaleString('is-IS').replace(/,/g,'.'); };
+const FIN_EMOJI=/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}️‍]/gu;
+const finStrip=s=>(s||'').replace(FIN_EMOJI,'').replace(/\s+/g,' ').trim();
+function finChipTone(raw){ const l=finStrip(raw).toLowerCase();
+  if(/^high$/.test(l))return 'neg'; if(/^med(ium)?$/.test(l))return 'warn'; if(/^low$/.test(l))return 'neutral';
+  if(/regularly over|duplicate|impulse/.test(l))return 'neg'; if(/over budget/.test(l))return 'warn';
+  if(/on track|smart/.test(l))return 'pos'; if(/start now|automate/.test(l))return 'accent'; return 'neutral'; }
+const finChip=raw=>`<span class="chip chip-${finChipTone(raw)}">${finStrip(raw)}</span>`;
+const FIN_PALETTE=['#2563eb','#16a34a','#C99A3F','#C16A41','#0e9488','#8b6fd6','#64748b','#0284c7','#65a30d','#b45309','#94a3b8','#9333ea','#475569'];
+const FIN_GRID='rgba(15,15,15,.06)';
+function finDraw(id,config){ const el=document.getElementById(id); if(!el||typeof Chart==='undefined')return;
+  if(finCharts[id])finCharts[id].destroy();
+  Chart.defaults.color='#6b7280'; Chart.defaults.font.family="'Plus Jakarta Sans',sans-serif";
+  finCharts[id]=new Chart(el.getContext('2d'),config); }
+
+function finRenderAll(){
+  const D=_finData; if(!D)return;
+  finOverview(D); finTrends(D); finCategories(D); finTransactions(D);
+  finSubscriptions(D); finNetWorth(D); finTravel(D); finPlan(D); finInsights(D); finInvest(D);
+  _finRendered=true;
+}
+
+function finOverview(D){
+  document.getElementById('ovStats').innerHTML=D.overview.map(s=>`
+    <div class="stat"><div class="label">${s.label}</div><div class="value">${s.value}</div><div class="sub">${s.sub}</div></div>`).join('');
+  const last4=D.monthlyTrend.slice(-4), cur=last4[last4.length-1];
+  document.getElementById('ieSummary').innerHTML=`<strong>${cur.month}:</strong> Income ${finFmt(cur.income)} · Spending ${finFmt(cur.spending)} · Net <span style="color:${cur.net>=0?'#16a34a':'#dc2626'}">${finFmt(cur.net)}</span>`;
+  finDraw('incomeExpenseChart',{type:'bar',data:{labels:last4.map(m=>m.month),datasets:[
+    {label:'Income',data:last4.map(m=>m.income),backgroundColor:'#2563eb',borderRadius:4},
+    {label:'Spending',data:last4.map(m=>m.spending),backgroundColor:'#C16A41',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false}},y:{grid:{color:FIN_GRID},ticks:{callback:v=>finPlain(v)}}},plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11.5}}}}}});
+  const rate=D.overview.find(o=>/savings rate/i.test(o.label));
+  if(rate){document.getElementById('savingsRateBig').textContent=rate.value;document.getElementById('savingsRateSub').textContent=rate.sub;}
+  const paid=D.monthlyTrend.filter(m=>m.income>0).slice(-10);
+  finDraw('savingsRateSpark',{type:'line',data:{labels:paid.map(m=>m.month),datasets:[{data:paid.map(m=>m.net/m.income*100),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',tension:.35,fill:true,pointRadius:0,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{display:false}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>Math.round(c.parsed.y)+'%'}}}}});
+  const cats=D.monthly2026Category.filter(c=>c.category!=='TOTAL SPENDING').slice().sort((a,b)=>b.total-a.total).slice(0,6);
+  const mx=Math.max(...cats.map(c=>c.total));
+  document.getElementById('topCategoryBars').innerHTML=cats.map((c,i)=>`
+    <div class="cat-bar-row"><div class="cat-bar-top"><span class="name">${c.category}</span><span class="amt">${finFmt(c.total)}</span></div>
+    <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${(c.total/mx*100).toFixed(1)}%;background:${FIN_PALETTE[i%FIN_PALETTE.length]}"></div></div></div>`).join('');
+  const bh=D.netWorth.balanceHistory, change=(bh[bh.length-1].balance-bh[0].balance)/bh[0].balance*100;
+  const pill=document.getElementById('growthChangeLabel');
+  pill.textContent=(change>=0?'+':'')+change.toFixed(1)+'% since '+bh[0].period; pill.classList.toggle('neg',change<0);
+  finDraw('growthChart',{type:'line',data:{labels:bh.map(b=>b.period),datasets:[{data:bh.map(b=>b.balance),borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.08)',tension:.3,fill:true,pointRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false}},y:{grid:{color:FIN_GRID},ticks:{callback:v=>finPlain(v)}}},plugins:{legend:{display:false}}}});
+  const fr=D.netWorth.breakdown.find(b=>/Framt/i.test(b.account));
+  document.getElementById('growthFootnote').textContent=`Auður savings only — the account with a full historical series.${fr?' Framtíðarreikningur ('+finFmt(fr.value)+') is a current snapshot with no timeline in the report.':''} Combined net worth today: ${finFmt(D.netWorth.total)}.`;
+}
+
+function finTrends(D){
+  finDraw('trendChart',{type:'bar',data:{labels:D.monthlyTrend.map(m=>m.month),datasets:[
+    {label:'Income',data:D.monthlyTrend.map(m=>m.income),backgroundColor:'#2563eb'},
+    {label:'Spending',data:D.monthlyTrend.map(m=>-m.spending),backgroundColor:'#C16A41'},
+    {label:'Net',type:'line',data:D.monthlyTrend.map(m=>m.net),borderColor:'#16a34a',backgroundColor:'#16a34a',tension:.3,pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false}},y:{grid:{color:FIN_GRID},ticks:{callback:v=>finPlain(v)}}},plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11.5}}}}}});
+  document.getElementById('trendTableBody').innerHTML=D.monthlyTrend.map(m=>`
+    <tr><td>${m.month}</td><td class="amt pos">${finFmt(m.income)}</td><td class="amt neg">${finFmt(m.spending)}</td><td class="amt ${m.net>=0?'pos':'neg'}">${finFmt(m.net)}</td></tr>`).join('');
+}
+
+function finCategories(D){
+  const rows=D.yearlyCategory.filter(c=>c.category!=='TOTAL');
+  finDraw('yearlyCatChart',{type:'bar',data:{labels:rows.map(c=>c.category),datasets:[
+    {label:'2024',data:rows.map(c=>c.y2024),backgroundColor:'#2563eb'},
+    {label:'2025',data:rows.map(c=>c.y2025),backgroundColor:'#0e9488'},
+    {label:'2026 (annualised)',data:rows.map(c=>c.y2026ann),backgroundColor:'#C99A3F'}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:FIN_GRID},ticks:{callback:v=>finPlain(v)}}},plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11.5}}}}}});
+  document.getElementById('yearlyCatTableBody').innerHTML=D.yearlyCategory.map(c=>`
+    <tr${c.category==='TOTAL'?' style="font-weight:700;background:#f7f8f9"':''}><td>${c.category}</td><td class="amt">${finFmt(c.y2024)}</td><td class="amt">${finFmt(c.y2025)}</td><td class="amt">${finFmt(c.y2026h1)}</td><td class="amt">${finFmt(c.y2026ann)}</td></tr>`).join('');
+  document.getElementById('monthly2026TableBody').innerHTML=D.monthly2026Category.map(c=>`
+    <tr${/TOTAL/.test(c.category)?' style="font-weight:700;background:#f7f8f9"':''}><td>${c.category}</td><td class="amt">${finFmt(c.jan)}</td><td class="amt">${finFmt(c.feb)}</td><td class="amt">${finFmt(c.mar)}</td><td class="amt">${finFmt(c.apr)}</td><td class="amt">${finFmt(c.may)}</td><td class="amt">${finFmt(c.jun)}</td><td class="amt">${finFmt(c.total)}</td><td class="amt">${finFmt(c.avgMo)}</td></tr>`).join('');
+}
+
+function finTransactions(D){
+  document.getElementById('keyTxTableBody').innerHTML=D.keyTransactions.map(t=>`
+    <tr><td style="white-space:nowrap">${t.date}</td><td>${t.merchant}</td><td class="amt">${t.amount===null?'—':finFmt(t.amount)}</td><td><span class="chip chip-neutral">${t.category}</span></td><td>${finChip(t.flag)}</td><td class="muted" style="font-size:12.5px">${finStrip(t.insight)}</td></tr>`).join('');
+}
+
+function finSubscriptions(D){
+  const s=D.subscriptions;
+  document.getElementById('subsTableBody').innerHTML=s.items.map(i=>`
+    <tr style="${i.active?'':'opacity:.55'}"><td>${i.active?'<span class="chip chip-pos">Active</span>':'<span class="chip chip-neg">Cancelled</span>'}</td>
+    <td><strong style="${i.active?'':'text-decoration:line-through'}">${i.service}</strong><br><span class="muted" style="font-size:11.5px">${i.domain}</span></td>
+    <td>${i.billing}</td><td class="amt">${finFmt(i.monthly)}</td><td class="amt">${finFmt(i.annual)}</td><td class="muted" style="font-size:12.5px">${finStrip(i.notes)}</td></tr>`).join('');
+  document.getElementById('subsActiveMonthly').textContent=finFmt(s.currentActiveMonthly);
+  document.getElementById('subsActiveAnnual').textContent=finFmt(s.currentActiveAnnual);
+  document.getElementById('subsTotalMonthly').textContent=finFmt(s.totalMonthly);
+  document.getElementById('subsTotalAnnual').textContent=finFmt(s.totalAnnual);
+  document.getElementById('savingsTableBody').innerHTML=s.savingsOpportunities.map(i=>`
+    <tr><td><strong>${i.cut}</strong></td><td class="muted" style="font-size:12.5px">${i.reason}</td><td class="amt pos">${finFmt(i.monthlySave)}</td><td class="amt pos">${finFmt(i.annualSave)}</td></tr>`).join('');
+  document.getElementById('savingsTotalMonthly').textContent=finFmt(s.totalPotentialSavingsMonthly);
+  document.getElementById('savingsTotalAnnual').textContent=finFmt(s.totalPotentialSavingsAnnual);
+}
+
+function finNetWorth(D){
+  const nw=D.netWorth;
+  finDraw('balanceChart',{type:'line',data:{labels:nw.balanceHistory.map(b=>b.period),datasets:[{data:nw.balanceHistory.map(b=>b.balance),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',tension:.3,fill:true,pointRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false}},y:{grid:{color:FIN_GRID},ticks:{callback:v=>finPlain(v)}}},plugins:{legend:{display:false}}}});
+  document.getElementById('balanceTableBody').innerHTML=nw.balanceHistory.map(b=>`
+    <tr><td>${b.period}</td><td class="amt">${finFmt(b.balance)}</td><td class="amt pos">${finFmt(b.interest)}</td><td class="muted" style="font-size:12.5px">${b.notes}</td></tr>`).join('');
+  finDraw('netWorthChart',{type:'doughnut',data:{labels:nw.breakdown.map(a=>a.account),datasets:[{data:nw.breakdown.map(a=>a.value),backgroundColor:FIN_PALETTE,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}});
+  document.getElementById('netWorthList').innerHTML=nw.breakdown.map((a,i)=>`
+    <li><div class="rank-name"><span class="idx">${i+1}</span><span class="txt">${a.account}<br><span class="muted" style="font-size:11.5px">${a.notes||''}</span></span></div><div class="rank-val">${finFmt(a.value)}</div></li>`).join('');
+  document.getElementById('netWorthTotal').textContent=finFmt(nw.total);
+}
+
+function finTravel(D){
+  document.getElementById('tripsContainer').innerHTML=D.travel.trips.map(t=>`
+    <div class="trip-card"><div class="top"><div><h4>${t.name}</h4><div class="period">${t.period}</div></div><div class="total">${finFmt(t.total)}</div></div>
+    <div class="trip-items">${t.items.map(i=>`<div class="trip-line"><div class="name">${i.name}</div><div class="amt">${finFmt(i.amount)}</div><div class="detail">${i.detail||''}${i.notes?' · '+i.notes:''}</div></div>`).join('')}</div></div>`).join('');
+}
+
+function finPlan(D){
+  document.getElementById('planBasis').textContent=finStrip(D.budgetPlan.basis);
+  document.getElementById('planGroups').innerHTML=D.budgetPlan.groups.map(g=>`
+    <div class="group-title">${finStrip(g.title)}</div>
+    ${g.items.map(i=>`<div class="plan-item"><div class="top"><span class="title" style="font-weight:600">${i.item}</span><span class="amt" style="font-weight:700">${finFmt(i.budget)}</span></div>
+    <div class="detail" style="color:#6b7280;font-size:13px;margin:6px 0">${i.notes||''}</div><div class="meta">${finChip(i.status)}</div></div>`).join('')}`).join('');
+}
+
+function finInsights(D){
+  document.getElementById('overallGrade').textContent=D.budgetScore.grade;
+  document.getElementById('overallSummary').textContent=D.budgetScore.summary;
+  document.getElementById('scoreCategories').innerHTML=D.budgetScore.categories.map(c=>`
+    <div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px">
+    <span><strong>${c.category}</strong> <span class="chip chip-neutral" style="margin-left:6px">${c.grade}</span></span><span class="muted">${c.score}/100</span></div>
+    <div class="score-bar-track"><div class="score-bar-fill" style="width:${c.score}%"></div></div>
+    <div class="muted" style="font-size:12.5px;margin-top:4px">${c.assessment}</div></div>`).join('');
+  document.getElementById('recGroups').innerHTML=D.recommendations.groups.map(g=>`
+    <div class="group-title">${finStrip(g.title)}</div>
+    ${g.items.map(i=>`<div class="rec-item"><div class="top"><span class="title">${i.recommendation}</span>${finChip(i.priority)}</div>
+    <div class="detail">${i.detail}</div><div class="meta"><span class="impact">${i.impact}</span><span class="action">${i.action}</span></div></div>`).join('')}`).join('');
+}
+
+function finInvest(D){
+  const last6=D.monthlyTrend.slice(-6),last12=D.monthlyTrend.slice(-12);
+  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const avgNet6=avg(last6.map(m=>m.net)), avgSpend6=avg(last6.map(m=>m.spending));
+  const nets12=last12.map(m=>m.net).slice().sort((a,b)=>a-b), medianNet12=(nets12[5]+nets12[6])/2;
+  const auður=(D.netWorth.breakdown.find(b=>/^Auður/.test(b.account))||{}).value||0;
+  const checking=(D.netWorth.breakdown.find(b=>/checking/i.test(b.account))||{}).value||0;
+  const framtid=(D.netWorth.breakdown.find(b=>/^Framt/.test(b.account))||{}).value||0;
+  const milan=(D.travel.trips.find(t=>/Milan/i.test(t.name))||{}).total||0;
+  const liquid=auður+checking, bufLow=avgSpend6*3, bufHigh=avgSpend6*6;
+  const excess=Math.max(liquid-bufHigh-milan,0), waste=D.subscriptions.totalPotentialSavingsMonthly;
+  document.getElementById('invStats').innerHTML=[
+    {label:'Typical month (avg, last 6mo)',value:finFmt(avgNet6),sub:'Skewed up by one large payout'},
+    {label:'Typical month (median, last 12mo)',value:finFmt(medianNet12),sub:'A more honest "normal" month'},
+    {label:'Cash held (Auður + checking)',value:finFmt(liquid),sub:'6-month buffer ~'+finFmt(bufHigh)},
+    {label:'Ready to invest now',value:finFmt(excess),sub:'After Milan + 6-month buffer'}
+  ].map(s=>`<div class="stat"><div class="label">${s.label}</div><div class="value">${s.value}</div><div class="sub">${s.sub}</div></div>`).join('');
+  document.getElementById('invCapacityText').innerHTML=`Your average net cash flow over the last 6 months (${finFmt(avgNet6)}/mo) is carried almost entirely by one large payout. The <strong>median</strong> month over the last 12 is closer to <strong>${finFmt(medianNet12)}</strong> — don't size a plan around your best month. This dashboard flags ~<strong>${finFmt(waste)}/mo</strong> of recoverable spending; fix that and you have a repeatable <strong>${finFmt(waste)}–50.000 kr.</strong>/mo to invest. For irregular pay, sweep a fixed <em>percentage</em> (20–25%) of each payout the day it lands.`;
+  document.getElementById('invEmergencyText').innerHTML=`No debt shows up in your tracked accounts. Your emergency fund is <strong>overfunded</strong>: a 3–6 month buffer against real spending (${finFmt(avgSpend6)}/mo) is ${finFmt(bufLow)}–${finFmt(bufHigh)}. You hold ${finFmt(liquid)} across Auður + checking — set aside the ${finFmt(milan)} Milan budget, keep a 6-month buffer, and roughly <strong>${finFmt(excess)}</strong> is idle. That lands near your Framtíðarreikningur (${finFmt(framtid)}) — your starting lump sum.`;
+  const split=(t,e,s,sp,c,st)=>({etf:t*e,ser:t*s,crypto:t*sp*c,stocks:t*sp*st});
+  const lump=split(excess,.70,.15,.15,2/3,1/3), mLow=split(waste,.70,.15,.15,2/3,1/3), mHi=split(50000,.70,.15,.15,2/3,1/3);
+  document.getElementById('invLumpHead').textContent=finFmt(excess)+' total';
+  document.getElementById('invLumpTableBody').innerHTML=`
+    <tr><td><strong>70% ETF</strong></td><td class="amt">${finFmt(lump.etf)}</td><td>Interactive Brokers</td><td>Auto-invest into <strong>VWCE</strong> over 12 months.</td></tr>
+    <tr><td><strong>15% séreign</strong></td><td class="amt">${finFmt(lump.ser)}</td><td>Payroll</td><td>Raise withholding % for ~6 paychecks if no lump option.</td></tr>
+    <tr><td><strong>10% crypto</strong></td><td class="amt">${finFmt(lump.crypto)}</td><td>Kraken/Coinbase</td><td>BTC/ETH only, 4–6 monthly tranches.</td></tr>
+    <tr><td><strong>5% stocks</strong></td><td class="amt">${finFmt(lump.stocks)}</td><td>Same IBKR</td><td>A few high-conviction names, phased.</td></tr>`;
+  document.getElementById('invMonthlyHead').textContent=finFmt(waste)+'–'+finFmt(50000)+'/mo';
+  document.getElementById('invMonthlyTableBody').innerHTML=`
+    <tr><td><strong>70% ETF</strong></td><td class="amt">${finFmt(mLow.etf)}–${finFmt(mHi.etf)}</td><td>Revolut</td><td>Recurring order into the same VWCE.</td></tr>
+    <tr><td><strong>15% séreign</strong></td><td class="amt">${finFmt(mLow.ser)}–${finFmt(mHi.ser)}</td><td>Payroll</td><td>Set ongoing séreign withholding %.</td></tr>
+    <tr><td><strong>10% crypto</strong></td><td class="amt">${finFmt(mLow.crypto)}–${finFmt(mHi.crypto)}</td><td>Kraken/Coinbase</td><td>Recurring buy.</td></tr>
+    <tr><td><strong>5% stocks</strong></td><td class="amt">${finFmt(mLow.stocks)}–${finFmt(mHi.stocks)}</td><td>Revolut</td><td>Fractional shares.</td></tr>`;
+  finDraw('investAllocChart',{type:'doughnut',data:{labels:['Global index ETF','Séreign top-up','Speculative'],datasets:[{data:[70,15,15],backgroundColor:[FIN_PALETTE[0],FIN_PALETTE[1],FIN_PALETTE[3]],borderWidth:0}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11.5}}}},cutout:'60%'}});
 }
 
 function renderFinMonthlyBars(){

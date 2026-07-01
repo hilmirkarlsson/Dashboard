@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -476,101 +477,189 @@
 
     <!-- ═══════════════ FINANCE PANEL ═══════════════ -->
     <section id="panel-finance" class="tab-panel">
+     <div class="fin-app">
 
-      <!-- 4 stat cards -->
-      <div class="fin2-stat-row">
-        <div class="fin2-sc">
-          <div class="fin2-sc-lbl">Balance</div>
-          <div class="fin2-sc-val tap" id="fp-bal" onclick="editFinField('bal')">—</div>
-          <div class="fin2-sc-sub">tap to edit</div>
-        </div>
-        <div class="fin2-sc">
-          <div class="fin2-sc-lbl">Spent this month</div>
-          <div class="fin2-sc-val tap" id="fp-spent" onclick="editFinField('spent')">—</div>
-          <div class="fin2-sc-sub" id="fp-spent-sub">of budget</div>
-        </div>
-        <div class="fin2-sc">
-          <div class="fin2-sc-lbl">Monthly budget</div>
-          <div class="fin2-sc-val tap" id="fp-budget" onclick="editFinField('budget')">—</div>
-          <div class="fin2-sc-sub" id="fp-budget-sub">tap to edit</div>
-        </div>
-        <div class="fin2-sc">
-          <div class="fin2-sc-lbl">Remaining</div>
-          <div class="fin2-sc-val" id="fp-rem">—</div>
-          <div class="fin2-sc-sub" id="fp-rem-sub"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;">Finance · from spreadsheet</div>
+        <span class="hst-sub" id="fin-source">loading…</span>
+      </div>
+
+      <!-- Sub-nav -->
+      <nav class="fin-tabs" id="fin-tabs">
+        <button class="active" data-fv="overview">Overview</button>
+        <button data-fv="trends">Trends</button>
+        <button data-fv="categories">Categories</button>
+        <button data-fv="transactions">Transactions</button>
+        <button data-fv="subscriptions">Subscriptions</button>
+        <button data-fv="networth">Net Worth</button>
+        <button data-fv="travel">Travel</button>
+        <button data-fv="plan">Plan</button>
+        <button data-fv="insights">Insights</button>
+        <button data-fv="invest">Invest</button>
+      </nav>
+
+      <div id="fin-loading" class="ghost" style="padding:40px 0;text-align:center;">Loading finance data from the spreadsheet…</div>
+      <div id="fin-views" style="display:none;">
+
+      <!-- OVERVIEW -->
+      <div class="fv active" id="fv-overview">
+        <div class="fin-snap" id="ovStats"></div>
+        <div class="board-grid">
+          <div class="card">
+            <div class="card-lbl">Income vs Expenses</div>
+            <div class="muted-sm" id="ieSummary" style="margin-bottom:12px;"></div>
+            <div class="chart-box"><canvas id="incomeExpenseChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-lbl">Savings Rate</div>
+            <div class="big-percent" id="savingsRateBig"></div>
+            <div class="savings-rate-sub" id="savingsRateSub"></div>
+            <div class="chart-box small"><canvas id="savingsRateSpark"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-lbl">Top Categories · 2026</div>
+            <div id="topCategoryBars"></div>
+          </div>
+          <div class="card">
+            <div class="fin-card-head"><div class="card-lbl" style="margin:0;">Savings Growth</div><span class="pill-change" id="growthChangeLabel"></span></div>
+            <div class="chart-box"><canvas id="growthChart"></canvas></div>
+            <div class="muted-sm" id="growthFootnote" style="margin-top:10px;"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Row: Monthly spending + Income vs Expenses -->
-      <div class="fin2-row fin2-row-6040">
+      <!-- TRENDS -->
+      <div class="fv" id="fv-trends">
         <div class="card">
-          <div class="fin2-card-hd">
-            <div class="fin2-card-lbl">Monthly Spending</div>
-            <button class="btn btn-lt" style="font-size:11px;padding:5px 12px;" onclick="archiveCurrentMonth();loadFinanceTab()">Save this month</button>
-          </div>
-          <div class="fin2-monthly-bars" id="fp-monthly-bars"></div>
-          <div class="fin2-hint">Bar = monthly spending · Dark bar = current month</div>
+          <div class="card-lbl">Monthly Income vs Spending · 30 months</div>
+          <div class="chart-box tall"><canvas id="trendChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="fin2-card-lbl">Income vs Expenses</div>
-          <div class="fin2-vs-list">
-            <div>
-              <div class="fin2-vs-hd"><span class="fin2-vs-label">Income</span><span class="fin2-vs-amount green tap" id="fp-income" onclick="editFinField('income')">tap to set</span></div>
-              <div class="fin2-prog-track"><div class="fin2-prog-fill green" id="fp-income-bar" style="width:100%;"></div></div>
+          <div class="card-lbl">Monthly Detail</div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Month</th><th class="r">Income</th><th class="r">Spending</th><th class="r">Net</th></tr></thead><tbody id="trendTableBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- CATEGORIES -->
+      <div class="fv" id="fv-categories">
+        <div class="card">
+          <div class="card-lbl">Annual Spending by Category</div>
+          <div class="chart-box tall"><canvas id="yearlyCatChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">Yearly Totals</div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Category</th><th class="r">2024</th><th class="r">2025</th><th class="r">2026 H1</th><th class="r">2026 Ann.</th></tr></thead><tbody id="yearlyCatTableBody"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">2026 Monthly by Category</div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Category</th><th class="r">Jan</th><th class="r">Feb</th><th class="r">Mar</th><th class="r">Apr</th><th class="r">May</th><th class="r">Jun</th><th class="r">Total</th><th class="r">Avg/Mo</th></tr></thead><tbody id="monthly2026TableBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- TRANSACTIONS -->
+      <div class="fv" id="fv-transactions">
+        <div class="card">
+          <div class="card-lbl">Notable 2026 Transactions</div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Date</th><th>Merchant</th><th class="r">Amount</th><th>Category</th><th>Flag</th><th>Insight</th></tr></thead><tbody id="keyTxTableBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- SUBSCRIPTIONS -->
+      <div class="fv" id="fv-subscriptions">
+        <div class="card">
+          <div class="card-lbl">Subscription Tracker</div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Status</th><th>Service</th><th>Billing</th><th class="r">Monthly</th><th class="r">Annual</th><th>Notes</th></tr></thead><tbody id="subsTableBody"></tbody></table></div>
+          <div class="fin-snap" style="margin-top:16px;">
+            <div class="stat"><div class="label">Currently active — monthly</div><div class="value pos" id="subsActiveMonthly"></div></div>
+            <div class="stat"><div class="label">Currently active — annual</div><div class="value pos" id="subsActiveAnnual"></div></div>
+            <div class="stat"><div class="label">Report total — monthly</div><div class="value" id="subsTotalMonthly"></div></div>
+            <div class="stat"><div class="label">Report total — annual</div><div class="value" id="subsTotalAnnual"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">Potential Savings — Cancel These</div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>What to Cut</th><th>Reason</th><th class="r">Monthly Save</th><th class="r">Annual Save</th></tr></thead><tbody id="savingsTableBody"></tbody></table></div>
+          <div class="fin-snap" style="margin-top:16px;">
+            <div class="stat"><div class="label">Potential monthly savings</div><div class="value pos" id="savingsTotalMonthly"></div></div>
+            <div class="stat"><div class="label">Potential annual savings</div><div class="value pos" id="savingsTotalAnnual"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NET WORTH -->
+      <div class="fv" id="fv-networth">
+        <div class="card">
+          <div class="card-lbl">Auður Balance History</div>
+          <div class="chart-box tall"><canvas id="balanceChart"></canvas></div>
+          <div class="fin-table-wrap" style="margin-top:12px;"><table class="fin-table"><thead><tr><th>Period</th><th class="r">Balance</th><th class="r">Interest</th><th>Notes</th></tr></thead><tbody id="balanceTableBody"></tbody></table></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-lbl">Net Worth Breakdown</div>
+            <div class="chart-box"><canvas id="netWorthChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-lbl">Accounts</div>
+            <ul class="rank-list" id="netWorthList"></ul>
+            <div class="fin-snap" style="margin-top:14px;">
+              <div class="stat"><div class="label">Total net worth</div><div class="value accent" id="netWorthTotal"></div></div>
             </div>
-            <div>
-              <div class="fin2-vs-hd"><span class="fin2-vs-label">Expenses</span><span class="fin2-vs-amount" id="fp-expenses-vs">—</span></div>
-              <div class="fin2-prog-track"><div class="fin2-prog-fill terracotta" id="fp-expenses-bar" style="width:0%;"></div></div>
-            </div>
           </div>
-          <div class="fin2-net-divider"></div>
-          <div class="fin2-net-row">
-            <span class="fin2-net-label">Net saved</span>
-            <span class="fin2-net-val" id="fp-net">—</span>
-          </div>
-          <div class="fin2-hint" id="fp-savings-rate"></div>
         </div>
       </div>
 
-      <!-- Row: Category donut + Recent transactions -->
-      <div class="fin2-row fin2-row-4060">
+      <!-- TRAVEL -->
+      <div class="fv" id="fv-travel">
+        <div id="tripsContainer"></div>
+      </div>
+
+      <!-- PLAN -->
+      <div class="fv" id="fv-plan">
         <div class="card">
-          <div class="fin2-card-lbl">Spending by Category</div>
-          <div class="fin2-donut-wrap">
-            <svg id="fp-donut-svg" width="132" height="132" viewBox="0 0 132 132" style="flex:none;">
-              <g id="fp-donut-arcs" transform="rotate(-90 66 66)">
-                <circle cx="66" cy="66" r="54" fill="none" stroke="#eef0f2" stroke-width="20"/>
-              </g>
-              <text x="66" y="62" text-anchor="middle" id="fp-donut-total" style="font:700 18px 'Plus Jakarta Sans',sans-serif;fill:#111827">—</text>
-              <text x="66" y="79" text-anchor="middle" style="font:600 9px 'Plus Jakarta Sans',sans-serif;fill:#9ca3af;letter-spacing:.07em">SPENT</text>
-            </svg>
-            <div id="fp-cat-legend" style="flex:1;display:flex;flex-direction:column;gap:9px;"></div>
-          </div>
-          <button class="ghost-btn" style="margin-top:12px;" onclick="editFinCats()">Edit category amounts</button>
-        </div>
-        <div class="card" style="padding:0;">
-          <div style="padding:18px 20px 12px;display:flex;justify-content:space-between;align-items:center;">
-            <div class="fin2-card-lbl" style="margin:0;">Recent Transactions</div>
-            <button class="btn btn-dk" style="font-size:11px;padding:5px 12px;" onclick="addFinTxn()">+ Add</button>
-          </div>
-          <div id="fp-txns"></div>
+          <div class="fin-card-head"><div class="card-lbl" style="margin:0;">Budget Plan</div><span class="muted-sm" id="planBasis"></span></div>
+          <div id="planGroups"></div>
         </div>
       </div>
 
-      <!-- Row: Budget by category + Savings goals -->
-      <div class="fin2-row">
+      <!-- INSIGHTS -->
+      <div class="fv" id="fv-insights">
         <div class="card">
-          <div class="fin2-card-lbl">Budget by Category</div>
-          <div id="fp-cat-budget-bars" style="display:flex;flex-direction:column;gap:13px;"></div>
-          <button class="ghost-btn" style="margin-top:14px;" onclick="editFinCatBudgets()">Edit budgets</button>
+          <div class="fin-grade-row">
+            <div class="grade-badge" id="overallGrade"></div>
+            <div style="font-size:14.5px;font-weight:600;" id="overallSummary"></div>
+          </div>
+          <div id="scoreCategories" style="margin-top:18px;"></div>
         </div>
         <div class="card">
-          <div class="fin2-card-lbl">Savings Goals</div>
-          <div id="fp-goals" style="display:flex;flex-direction:column;gap:13px;"></div>
-          <button class="ghost-btn" style="margin-top:14px;" onclick="addFinGoal()">+ Add goal</button>
+          <div class="card-lbl">Recommendations</div>
+          <div id="recGroups"></div>
         </div>
       </div>
 
+      <!-- INVEST -->
+      <div class="fv" id="fv-invest">
+        <div class="card">
+          <div class="card-lbl">Investing Capacity</div>
+          <div class="fin-snap" id="invStats" style="margin-bottom:16px;"></div>
+          <div id="invCapacityText" style="font-size:13.5px;line-height:1.65;color:#4d4d4a;"></div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">Debt & Emergency Fund</div>
+          <div id="invEmergencyText" style="font-size:13.5px;line-height:1.65;color:#4d4d4a;"></div>
+        </div>
+        <div class="card">
+          <div class="fin-card-head"><div class="card-lbl" style="margin:0;">Action Plan — Lump Sum</div><span class="muted-sm" id="invLumpHead"></span></div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Allocation</th><th class="r">Amount</th><th>Where</th><th>How</th></tr></thead><tbody id="invLumpTableBody"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="fin-card-head"><div class="card-lbl" style="margin:0;">Action Plan — Monthly Recurring</div><span class="muted-sm" id="invMonthlyHead"></span></div>
+          <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Allocation</th><th class="r">Amount</th><th>Where</th><th>How</th></tr></thead><tbody id="invMonthlyTableBody"></tbody></table></div>
+          <div class="chart-box" style="margin-top:16px;"><canvas id="investAllocChart"></canvas></div>
+        </div>
+      </div>
+
+      </div><!-- /fin-views -->
+     </div><!-- /fin-app -->
     </section><!-- /panel-finance -->
 
     <!-- ═══════════════ PROJECTS PANEL ═══════════════ -->

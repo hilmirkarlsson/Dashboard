@@ -1,6 +1,7 @@
 const http    = require('http');
 const url     = require('url');
 const { google } = require('googleapis');
+const { parseFinanceWorkbook } = require('./financeParser');
 
 const PORT = process.env.PORT || 9876;
 
@@ -11,6 +12,9 @@ const SA_KEY = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'null');
 const HEALTH_FOLDER_ID  = process.env.HEALTH_FOLDER_ID  || '';
 const WORKOUT_FOLDER_ID = process.env.WORKOUT_FOLDER_ID || '';
 const VAULT_FOLDER_ID   = process.env.VAULT_FOLDER_ID   || '';
+
+// In-memory cache for the parsed finance workbook (5-min TTL, see endpoint).
+let _financeCache = null;
 
 function getDrive() {
   if (!SA_KEY) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not set');
@@ -69,6 +73,16 @@ async function downloadFile(fileId) {
     { responseType: 'text' }
   );
   return res.data;
+}
+
+// Download a file's raw bytes (for binary formats like .xlsx)
+async function downloadBinary(fileId) {
+  const drive = getDrive();
+  const res = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'arraybuffer' }
+  );
+  return Buffer.from(res.data);
 }
 
 // Find a file in a Drive folder by name
@@ -350,6 +364,35 @@ http.createServer(async (req, res) => {
       }
       workouts.sort((a, b) => (a.start || '') < (b.start || '') ? -1 : 1);
       return jsonReply(res, { workouts });
+    }
+
+    // GET /api/finance-json — parse the latest "Hilmir Finance vN.xlsx" in the
+    // vault (2-Areas/Finance) into the dashboard's finance JSON. Cached 5 min
+    // so we don't re-download + re-parse the workbook on every tab open.
+    if (pn === '/api/finance-json') {
+      const now = Date.now();
+      if (_financeCache && now - _financeCache.at < 5 * 60 * 1000) {
+        return jsonReply(res, _financeCache.data);
+      }
+      const areas = await findFolder(VAULT_FOLDER_ID, '2-Areas');
+      const finDir = areas && await findFolder(areas.id, 'Finance');
+      if (!finDir) return reply(res, 404, 'Finance folder not found in vault');
+      const drive = getDrive();
+      const r = await drive.files.list({
+        q: `'${finDir.id}' in parents and trashed = false and name contains 'Finance'`,
+        fields: 'files(id, name)',
+        pageSize: 50,
+      });
+      // Pick the highest version number among "Hilmir Finance vN.xlsx".
+      const xlsx = (r.data.files || [])
+        .filter(f => /\.xlsx$/i.test(f.name))
+        .map(f => ({ ...f, v: (f.name.match(/v(\d+)/i) || [])[1] | 0 }))
+        .sort((a, b) => b.v - a.v)[0];
+      if (!xlsx) return reply(res, 404, 'No finance workbook found');
+      const data = parseFinanceWorkbook(await downloadBinary(xlsx.id));
+      data.source = xlsx.name;
+      _financeCache = { at: now, data };
+      return jsonReply(res, data);
     }
 
     // GET /api/workout-json
