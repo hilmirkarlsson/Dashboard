@@ -393,7 +393,11 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       $('z-active').textContent = z.activeCal  ? z.activeCal.toLocaleString()+' kcal' : '—';
       if (z.synced) {
         const mins = Math.round((Date.now()-new Date(z.synced))/60000);
-        $('z-sync-status').textContent = mins < 1 ? 'synced just now' : 'synced '+mins+'m ago';
+        const stale = mins > 20; // export automations sync every few minutes — this old means it's stuck
+        const el = $('z-sync-status');
+        el.textContent = stale ? '⚠ stale — synced '+mins+'m ago' : (mins < 1 ? 'synced just now' : 'synced '+mins+'m ago');
+        el.style.color = stale ? '#dc2626' : '';
+        el.style.fontWeight = stale ? '600' : '';
       }
     }
 
