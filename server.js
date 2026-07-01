@@ -189,6 +189,10 @@ http.createServer(async (req, res) => {
       if (!file) return reply(res, 404, 'No health data yet');
       const raw = await downloadFile(file.id);
       const data = normalizeHealthData(JSON.parse(raw));
+      // Report when the export file itself was last updated, not when this
+      // request happened — otherwise a stale export still says "synced
+      // just now" and hides that no new data has actually landed.
+      data.synced = file.modifiedTime || data.synced;
       return jsonReply(res, data);
     }
 
