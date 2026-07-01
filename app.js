@@ -351,7 +351,7 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       fetch(API + '/api/health-json').then(r=>r.json()).then(z=>{
         renderZeppStats(z); renderHealthGroups(z);
       }).catch(()=>{
-        try { const z=JSON.parse(localStorage.getItem('dash-zepp-data')||'null'); if(z){ renderZeppStats(z); renderHealthGroups(z); } } catch(e){}
+        try { const z=JSON.parse(localStorage.getItem('dash-zepp-data')||'null'); if(z&&!isStaleZepp(z)){ renderZeppStats(z); renderHealthGroups(z); } } catch(e){}
       });
       fetch(API + '/api/workout-json').then(r=>r.json()).then(d=>{ _workoutData=d; renderWorkouts(d,'all'); }).catch(()=>{
         document.getElementById('workout-list').innerHTML='<div style="padding:16px 20px;" class="ghost">No workout data yet</div>';
@@ -373,6 +373,13 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
     function editWtH() { const h=gh(); const v=prompt('Weight (kg):',h.wt||'84'); if(v!==null&&v.trim()){h.wt=v.trim();sh(h);renderH();loadHealthTab();} }
     function togGym2() { const h=gh(); h.gym=!h.gym; sh(h); renderH(); loadHealthTab(); }
     function setN2(v) { setN(v); loadHealthTab(); }
+
+    function isStaleZepp(z) {
+      // Cached data from a previous day is stale once past 00:00 — the
+      // daily stats (steps, calories, etc.) should reset, not persist.
+      if (!z.synced) return false;
+      return z.synced.slice(0,10) !== new Date().toISOString().slice(0,10);
+    }
 
     function renderZeppStats(z) {
       const $=id=>document.getElementById(id);

@@ -65,6 +65,14 @@ async function findFolder(parentId, name) {
   return res.data.files?.[0] || null;
 }
 
+// Keep only data points recorded on the current calendar day, so
+// cumulative metrics (steps, calories, distance, ...) reset at 00:00
+// instead of accumulating across every day present in the export file.
+function onlyToday(data) {
+  const today = new Date().toISOString().slice(0, 10);
+  return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === today);
+}
+
 function normalizeHealthData(d) {
   if (typeof d.steps !== 'undefined' || typeof d.restingHR !== 'undefined') return d;
 
@@ -74,14 +82,20 @@ function normalizeHealthData(d) {
   metrics.forEach(m => {
     if (!m.data?.length) return;
     switch (m.name) {
-      case 'step_count':
-        out.steps = Math.round(m.data.reduce((s, e) => s + (e.qty || 0), 0));
+      case 'step_count': {
+        const today = onlyToday(m.data);
+        out.steps = Math.round(today.reduce((s, e) => s + (e.qty || 0), 0));
         break;
-      case 'resting_heart_rate':
-        out.restingHR = Math.round(m.data[0].qty);
+      }
+      case 'resting_heart_rate': {
+        const today = onlyToday(m.data);
+        if (today.length) out.restingHR = Math.round(today[today.length - 1].qty);
         break;
+      }
       case 'sleep_analysis': {
-        const s = m.data[0];
+        // Sleep spans midnight, so report the most recent session (last
+        // night) rather than filtering by today's date.
+        const s = m.data[m.data.length - 1];
         out.sleepHours = +(s.totalSleep || 0).toFixed(1);
         out.sleepDeep  = +(s.deep  || 0).toFixed(1);
         out.sleepREM   = +(s.rem   || 0).toFixed(1);
@@ -92,44 +106,53 @@ function normalizeHealthData(d) {
         out.sleepEnd   = s.sleepEnd   || null;
         break;
       }
-      case 'active_energy':
-        out.activeCal = Math.round(m.data.reduce((s, e) => s + (e.qty || 0), 0) * 0.239);
+      case 'active_energy': {
+        const today = onlyToday(m.data);
+        out.activeCal = Math.round(today.reduce((s, e) => s + (e.qty || 0), 0) * 0.239);
         break;
-      case 'basal_energy_burned':
-        out.basalCal = Math.round(m.data.reduce((s, e) => s + (e.qty || 0), 0) * 0.239);
+      }
+      case 'basal_energy_burned': {
+        const today = onlyToday(m.data);
+        out.basalCal = Math.round(today.reduce((s, e) => s + (e.qty || 0), 0) * 0.239);
         break;
+      }
       case 'heart_rate_variability': {
-        const vals = m.data.map(e => e.qty).filter(Boolean);
+        const vals = onlyToday(m.data).map(e => e.qty).filter(Boolean);
         out.hrv = vals.length ? Math.round(vals.reduce((a, b) => a + b) / vals.length) : null;
         break;
       }
       case 'heart_rate': {
-        const mins = m.data.map(e => e.Min ?? e.qty).filter(v => v != null);
-        const maxs = m.data.map(e => e.Max ?? e.qty).filter(v => v != null);
-        const avgs = m.data.map(e => e.Avg ?? e.qty).filter(v => v != null);
+        const today = onlyToday(m.data);
+        const mins = today.map(e => e.Min ?? e.qty).filter(v => v != null);
+        const maxs = today.map(e => e.Max ?? e.qty).filter(v => v != null);
+        const avgs = today.map(e => e.Avg ?? e.qty).filter(v => v != null);
         out.minHR = mins.length ? Math.round(Math.min(...mins)) : null;
         out.maxHR = maxs.length ? Math.round(Math.max(...maxs)) : null;
         out.avgHR = avgs.length ? Math.round(avgs.reduce((a, b) => a + b) / avgs.length) : null;
         break;
       }
       case 'respiratory_rate': {
-        const vals = m.data.map(e => e.qty).filter(Boolean);
+        const vals = onlyToday(m.data).map(e => e.qty).filter(Boolean);
         out.respiratoryRate = vals.length ? +(vals.reduce((a, b) => a + b) / vals.length).toFixed(1) : null;
         break;
       }
-      case 'walking_running_distance':
-        out.distanceKm = +(m.data.reduce((s, e) => s + (e.qty || 0), 0)).toFixed(2);
+      case 'walking_running_distance': {
+        const today = onlyToday(m.data);
+        out.distanceKm = +(today.reduce((s, e) => s + (e.qty || 0), 0)).toFixed(2);
         break;
-      case 'flights_climbed':
-        out.flightsClimbed = Math.round(m.data.reduce((s, e) => s + (e.qty || 0), 0));
+      }
+      case 'flights_climbed': {
+        const today = onlyToday(m.data);
+        out.flightsClimbed = Math.round(today.reduce((s, e) => s + (e.qty || 0), 0));
         break;
+      }
       case 'walking_speed': {
-        const vals = m.data.map(e => e.qty).filter(Boolean);
+        const vals = onlyToday(m.data).map(e => e.qty).filter(Boolean);
         out.walkingSpeed = vals.length ? +(vals.reduce((a, b) => a + b) / vals.length).toFixed(1) : null;
         break;
       }
       case 'walking_step_length': {
-        const vals = m.data.map(e => e.qty).filter(Boolean);
+        const vals = onlyToday(m.data).map(e => e.qty).filter(Boolean);
         out.stepLength = vals.length ? Math.round(vals.reduce((a, b) => a + b) / vals.length) : null;
         break;
       }
