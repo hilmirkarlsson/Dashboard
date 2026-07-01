@@ -264,7 +264,11 @@
     .body-bar-fill{height:100%;border-radius:5px;background:#2563eb;transition:width .5s}
 
     /* ── HEALTH · REDESIGN ───────────────────────────────── */
-    .chip{font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:3px 9px;letter-spacing:.02em;white-space:nowrap}
+    /* Equal card heights per row + tabular figures so data never jitters */
+    #panel-health .p2, #panel-health .p3, #panel-health .p23{align-items:stretch}
+    #panel-health .p2>.card, #panel-health .p3>.card, #panel-health .p23>.card{height:100%}
+    .rdy-stat-v,.hbig-val,.hmini-val,.hval,.wk-summary .big,.calbar-lbl+.hval{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+    .chip{font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:3px 9px;letter-spacing:.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
     .chip.up{background:rgba(22,163,74,.1);color:#16a34a}
     .chip.down{background:rgba(239,68,68,.1);color:#dc2626}
     .chip.warn{background:rgba(217,119,6,.1);color:#d97706}
@@ -285,7 +289,7 @@
     .rdy-stat-l{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;text-align:right;margin-top:2px}
 
     /* Top 3 ring cards */
-    .hcard3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+    .hcard3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:18px}
     .hbig{background:#fff;border:1px solid #e8eaed;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:20px 22px;display:flex;flex-direction:column;min-height:200px}
     .hbig-top{display:flex;align-items:center;gap:9px;margin-bottom:14px}
     .hbig-ico{font-size:15px}
