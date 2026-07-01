@@ -1,182 +1,70 @@
-// Dashboard-1 local server — serves dashboard + Obsidian vault API + health sync
-// Run: node server.js
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
-const url  = require('url');
+const http    = require('http');
+const url     = require('url');
+const { google } = require('googleapis');
 
-const PORT        = 9876;
-const VAULT       = path.resolve('G:\\My Drive\\Vault');
-const ROOT        = path.resolve('G:\\My Drive\\Projects\\Dashboard-1');
-const HEALTH_FILE      = path.join(ROOT, 'health.json');
-const GDRIVE_HEALTH_DIR  = path.resolve('G:\\My Drive\\Health Auto Export\\Health');
-const GDRIVE_WORKOUT_DIR = path.resolve('G:\\My Drive\\Health Auto Export\\Workout');
+const PORT = process.env.PORT || 9876;
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css':  'text/css',
-  '.js':   'application/javascript',
-  '.json': 'application/json',
-  '.png':  'image/png',
-  '.jpg':  'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.svg':  'image/svg+xml',
-  '.ico':  'image/x-icon',
-  '.md':   'text/plain; charset=utf-8',
-};
+// Service account key from env var (JSON string)
+const SA_KEY = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'null');
 
-http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+// Google Drive folder IDs — set these after sharing folders with service account
+const HEALTH_FOLDER_ID  = process.env.HEALTH_FOLDER_ID  || '';
+const WORKOUT_FOLDER_ID = process.env.WORKOUT_FOLDER_ID || '';
+const VAULT_FOLDER_ID   = process.env.VAULT_FOLDER_ID   || '';
 
-  const parsed = url.parse(req.url, true);
-  const pn     = decodeURIComponent(parsed.pathname);
-
-  // POST /api/update-health — iPhone Shortcut sends health JSON here
-  if (pn === '/api/update-health' && req.method === 'POST') {
-    let body = '';
-    req.on('data', d => body += d);
-    req.on('end', () => {
-      try {
-        const data = JSON.parse(body);
-        data.synced = new Date().toISOString();
-        fs.writeFile(HEALTH_FILE, JSON.stringify(data, null, 2), err => {
-          if (err) return reply(res, 500, 'Write failed');
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, synced: data.synced }));
-          console.log('[health] synced:', data);
-        });
-      } catch { reply(res, 400, 'Invalid JSON'); }
-    });
-    return;
-  }
-
-  // GET /api/health-json — reads latest Health Auto Export file from Google Drive
-  if (pn === '/api/health-json') {
-    latestFileIn(GDRIVE_HEALTH_DIR, (err, filePath) => {
-      const fallback = () => fs.readFile(HEALTH_FILE, 'utf8', (e2, raw2) => {
-        if (e2) return reply(res, 404, 'No health data yet');
-        serveNormalizedHealth(res, raw2);
-      });
-      if (err || !filePath) return fallback();
-      fs.readFile(filePath, 'utf8', (e, raw) => {
-        if (e) return fallback();
-        serveNormalizedHealth(res, raw);
-      });
-    });
-    return;
-  }
-
-  // GET /api/workout-json — reads latest workout file from Google Drive
-  if (pn === '/api/workout-json') {
-    latestFileIn(GDRIVE_WORKOUT_DIR, (err, filePath) => {
-      if (err || !filePath) return reply(res, 404, 'No workout data yet');
-      fs.readFile(filePath, 'utf8', (e, raw) => {
-        if (e) return reply(res, 404, 'No workout data yet');
-        try {
-          const d = JSON.parse(raw);
-          const workouts = (d?.data?.workouts || []).map(w => ({
-            name:     w.name || 'Workout',
-            start:    w.start,
-            end:      w.end,
-            duration: Math.round((w.duration || 0) / 60), // seconds → minutes
-            avgHR:    Math.round(w.avgHeartRate?.qty || w.heartRate?.avg?.qty || 0),
-            maxHR:    Math.round(w.maxHeartRate?.qty || w.heartRate?.max?.qty || 0),
-            minHR:    Math.round(w.heartRate?.min?.qty || 0),
-          kcal:     Math.round((w.activeEnergyBurned?.qty || 0) * 0.239),
-          }));
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ workouts, file: path.basename(filePath) }));
-        } catch { reply(res, 500, 'Parse error'); }
-      });
-    });
-    return;
-  }
-
-  // GET /api/vault?file=relative/path.md  — read a vault file
-  if (pn === '/api/vault') {
-    const rel  = parsed.query.file;
-    if (!rel) return reply(res, 400, 'Missing file param');
-    const full = path.resolve(VAULT, rel);
-    if (!full.startsWith(VAULT + path.sep) && full !== VAULT)
-      return reply(res, 403, 'Forbidden');
-    fs.readFile(full, 'utf8', (err, data) => {
-      if (err) return reply(res, 404, 'Not found: ' + rel);
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end(data);
-    });
-    return;
-  }
-
-  // GET /api/vault-dir?dir=relative/dir  — list vault directory
-  if (pn === '/api/vault-dir') {
-    const rel  = parsed.query.dir || '';
-    const full = path.resolve(VAULT, rel);
-    if (!full.startsWith(VAULT + path.sep) && full !== VAULT)
-      return reply(res, 403, 'Forbidden');
-    fs.readdir(full, { withFileTypes: true }, (err, entries) => {
-      if (err) return reply(res, 404, 'Not found');
-      const list = entries.map(e => ({ name: e.name, isDir: e.isDirectory() }));
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(list));
-    });
-    return;
-  }
-
-  // GET /api/proxy?url=... — proxy public Google Sheets CSV
-  if (pn === '/api/proxy') {
-    const target = parsed.query.url;
-    if (!target || !target.startsWith('https://docs.google.com/spreadsheets/'))
-      return reply(res, 403, 'Forbidden');
-    const https = require('https');
-    https.get(target, r => {
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-      r.pipe(res);
-    }).on('error', e => reply(res, 502, e.message));
-    return;
-  }
-
-  // Static files from Dashboard-1
-  const rel  = pn === '/' ? '/index.html' : pn;
-  const full = path.join(ROOT, rel);
-  if (!full.startsWith(ROOT)) return reply(res, 403, 'Forbidden');
-
-  fs.readFile(full, (err, data) => {
-    if (err) return reply(res, 404, 'Not found: ' + rel);
-    const ext = path.extname(full);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-    res.end(data);
+function getDrive() {
+  if (!SA_KEY) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not set');
+  const auth = new google.auth.GoogleAuth({
+    credentials: SA_KEY,
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
   });
-
-// Listen on all interfaces so iPhone on same WiFi can reach it
-}).listen(PORT, '0.0.0.0', () => {
-  console.log('\n  Dashboard  →  http://localhost:' + PORT);
-  console.log('  iPhone sync →  http://192.168.8.163:' + PORT + '/api/update-health\n');
-});
-
-// Find the most recently modified file in a directory
-function latestFileIn(dir, cb) {
-  fs.readdir(dir, { withFileTypes: true }, (err, entries) => {
-    if (err) return cb(err);
-    const files = entries.filter(e => e.isFile()).map(e => {
-      const fp = path.join(dir, e.name);
-      try { return { fp, mt: fs.statSync(fp).mtimeMs }; } catch { return null; }
-    }).filter(Boolean).sort((a, b) => b.mt - a.mt);
-    cb(null, files[0]?.fp || null);
-  });
+  return google.drive({ version: 'v3', auth });
 }
 
-function serveNormalizedHealth(res, raw) {
-  try {
-    const d = JSON.parse(raw);
-    const out = normalizeHealthData(d);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(out));
-  } catch { reply(res, 500, 'Parse error'); }
+// Find latest file in a Drive folder (by modifiedTime desc)
+async function latestFileIn(folderId) {
+  const drive = getDrive();
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
+    orderBy: 'modifiedTime desc',
+    pageSize: 1,
+    fields: 'files(id, name, modifiedTime)',
+  });
+  return res.data.files?.[0] || null;
 }
 
-// Parses Health Auto Export JSON or plain {steps, restingHR, ...}
+// Download a file's content by Drive file ID
+async function downloadFile(fileId) {
+  const drive = getDrive();
+  const res = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'text' }
+  );
+  return res.data;
+}
+
+// Find a file in a Drive folder by name
+async function findFileByName(folderId, name) {
+  const drive = getDrive();
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and name = '${name.replace(/'/g, "\\'")}' and trashed = false`,
+    pageSize: 1,
+    fields: 'files(id, name)',
+  });
+  return res.data.files?.[0] || null;
+}
+
+// Find a subfolder by name inside a parent folder
+async function findFolder(parentId, name) {
+  const drive = getDrive();
+  const res = await drive.files.list({
+    q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${name.replace(/'/g, "\\'")}' and trashed = false`,
+    pageSize: 1,
+    fields: 'files(id, name)',
+  });
+  return res.data.files?.[0] || null;
+}
+
 function normalizeHealthData(d) {
   if (typeof d.steps !== 'undefined' || typeof d.restingHR !== 'undefined') return d;
 
@@ -254,3 +142,87 @@ function reply(res, code, msg) {
   res.writeHead(code, { 'Content-Type': 'text/plain' });
   res.end(msg);
 }
+
+function jsonReply(res, data) {
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(JSON.stringify(data));
+}
+
+http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  const parsed = url.parse(req.url, true);
+  const pn     = decodeURIComponent(parsed.pathname);
+
+  try {
+    // GET /api/health-json
+    if (pn === '/api/health-json') {
+      const file = await latestFileIn(HEALTH_FOLDER_ID);
+      if (!file) return reply(res, 404, 'No health data yet');
+      const raw = await downloadFile(file.id);
+      const data = normalizeHealthData(JSON.parse(raw));
+      return jsonReply(res, data);
+    }
+
+    // GET /api/workout-json
+    if (pn === '/api/workout-json') {
+      const file = await latestFileIn(WORKOUT_FOLDER_ID);
+      if (!file) return reply(res, 404, 'No workout data yet');
+      const raw = await downloadFile(file.id);
+      const d = JSON.parse(raw);
+      const workouts = (d?.data?.workouts || []).map(w => ({
+        name:     w.name || 'Workout',
+        start:    w.start,
+        end:      w.end,
+        duration: Math.round((w.duration || 0) / 60),
+        avgHR:    Math.round(w.avgHeartRate?.qty || w.heartRate?.avg?.qty || 0),
+        maxHR:    Math.round(w.maxHeartRate?.qty || w.heartRate?.max?.qty || 0),
+        minHR:    Math.round(w.heartRate?.min?.qty || 0),
+        kcal:     Math.round((w.activeEnergyBurned?.qty || 0) * 0.239),
+      }));
+      return jsonReply(res, { workouts, file: file.name });
+    }
+
+    // GET /api/vault?file=relative/path.md
+    if (pn === '/api/vault') {
+      const rel = parsed.query.file;
+      if (!rel) return reply(res, 400, 'Missing file param');
+
+      // Navigate folder path in Drive
+      const parts = rel.split('/');
+      const fileName = parts.pop();
+      let currentFolder = VAULT_FOLDER_ID;
+      for (const part of parts) {
+        const folder = await findFolder(currentFolder, part);
+        if (!folder) return reply(res, 404, 'Not found: ' + rel);
+        currentFolder = folder.id;
+      }
+      const file = await findFileByName(currentFolder, fileName);
+      if (!file) return reply(res, 404, 'Not found: ' + rel);
+      const content = await downloadFile(file.id);
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+      });
+      return res.end(content);
+    }
+
+    // Health check
+    if (pn === '/api/ping') {
+      return jsonReply(res, { ok: true });
+    }
+
+    reply(res, 404, 'Not found');
+  } catch (err) {
+    console.error(err);
+    reply(res, 500, err.message);
+  }
+
+}).listen(PORT, () => {
+  console.log('Dashboard API running on port ' + PORT);
+});
