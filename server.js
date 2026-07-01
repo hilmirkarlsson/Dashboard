@@ -188,6 +188,29 @@ http.createServer(async (req, res) => {
       return jsonReply(res, { workouts, file: file.name });
     }
 
+    // GET /api/vault-dir?dir=relative/dir — list files in a vault folder
+    if (pn === '/api/vault-dir') {
+      const rel = parsed.query.dir || '';
+      const parts = rel.split('/').filter(Boolean);
+      let currentFolder = VAULT_FOLDER_ID;
+      for (const part of parts) {
+        const folder = await findFolder(currentFolder, part);
+        if (!folder) return jsonReply(res, []);
+        currentFolder = folder.id;
+      }
+      const drive = getDrive();
+      const r = await drive.files.list({
+        q: `'${currentFolder}' in parents and trashed = false`,
+        fields: 'files(id, name, mimeType)',
+        pageSize: 100,
+      });
+      const list = (r.data.files || []).map(f => ({
+        name: f.name,
+        isDir: f.mimeType === 'application/vnd.google-apps.folder',
+      }));
+      return jsonReply(res, list);
+    }
+
     // GET /api/vault?file=relative/path.md
     if (pn === '/api/vault') {
       const rel = parsed.query.file;
