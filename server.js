@@ -101,6 +101,73 @@ function onlyToday(data) {
   return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === today);
 }
 
+function onlyDate(data, dateStr) {
+  return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === dateStr);
+}
+
+// Intraday hourly buckets + a downsampled heart-rate line, for sparklines.
+// Iceland runs on GMT year-round, so the export's "+0000" hour is local hour.
+function computeIntraday(metrics) {
+  const hourOf = e => {
+    if (typeof e.date !== 'string') return null;
+    const h = parseInt(e.date.slice(11, 13), 10);
+    return Number.isFinite(h) ? h : null;
+  };
+  const hourly = (m, mult = 1) => {
+    const buckets = new Array(24).fill(0);
+    onlyToday(m?.data || []).forEach(e => {
+      const h = hourOf(e); if (h != null) buckets[h] += (e.qty || 0) * mult;
+    });
+    return buckets.map(v => Math.round(v));
+  };
+  const byName = {};
+  metrics.forEach(m => { byName[m.name] = m; });
+  const out = {
+    stepsHourly:  byName.step_count      ? hourly(byName.step_count)          : null,
+    activeHourly: byName.active_energy   ? hourly(byName.active_energy, 0.239) : null,
+  };
+  // Heart rate: downsample today's samples to ~48 points for a smooth line.
+  const hr = onlyToday(byName.heart_rate?.data || [])
+    .map(e => e.Avg ?? e.qty).filter(v => v != null);
+  if (hr.length) {
+    const step = Math.max(1, Math.ceil(hr.length / 48));
+    const line = [];
+    for (let i = 0; i < hr.length; i += step) line.push(Math.round(hr[i]));
+    out.hrSeries = line;
+  }
+  return out;
+}
+
+// Compact one-day summary keyed to a specific date, for history/trends.
+function summarizeForDate(metrics, dateStr) {
+  const sum = arr => arr.reduce((s, e) => s + (e.qty || 0), 0);
+  const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  const by = {}; metrics.forEach(m => { by[m.name] = m?.data || []; });
+  const rhr = onlyDate(by.resting_heart_rate || [], dateStr).map(e => e.qty).filter(Boolean);
+  const hrv = onlyDate(by.heart_rate_variability || [], dateStr).map(e => e.qty).filter(Boolean);
+  const sleep = (by.sleep_analysis || []).filter(s =>
+    typeof s.date === 'string' && s.date.slice(0, 10) === dateStr);
+  const s = sleep[sleep.length - 1];
+  return {
+    date: dateStr,
+    steps: Math.round(sum(onlyDate(by.step_count || [], dateStr))),
+    activeCal: Math.round(sum(onlyDate(by.active_energy || [], dateStr)) * 0.239),
+    basalCal: Math.round(sum(onlyDate(by.basal_energy_burned || [], dateStr)) * 0.239),
+    restingHR: rhr.length ? Math.round(rhr[rhr.length - 1]) : null,
+    hrv: hrv.length ? Math.round(avg(hrv)) : null,
+    sleepHours: s ? +(s.totalSleep || 0).toFixed(1) : null,
+  };
+}
+
+// All calendar dates that appear in a parsed export's metrics.
+function datesInExport(metrics) {
+  const set = new Set();
+  metrics.forEach(m => (m.data || []).forEach(e => {
+    if (typeof e.date === 'string') set.add(e.date.slice(0, 10));
+  }));
+  return [...set];
+}
+
 function normalizeHealthData(d) {
   if (typeof d.steps !== 'undefined' || typeof d.restingHR !== 'undefined') return d;
 
@@ -233,7 +300,56 @@ http.createServer(async (req, res) => {
       // request happened — otherwise a stale export still says "synced
       // just now" and hides that no new data has actually landed.
       data.synced = best.modifiedTime || data.synced;
+      const metrics = bestParsed?.data?.metrics || bestParsed?.metrics || [];
+      data.intraday = computeIntraday(metrics);
       return jsonReply(res, data);
+    }
+
+    // GET /api/health-history — compact per-day summaries across every export
+    // file, for 7-day averages, deltas and trend sparklines. Grows over time.
+    if (pn === '/api/health-history') {
+      const files = await recentFilesIn(HEALTH_FOLDER_ID, 60);
+      const byDate = {};
+      for (const file of files) {
+        let parsed;
+        try { parsed = JSON.parse(await downloadFile(file.id)); }
+        catch (e) { continue; }
+        const metrics = parsed?.data?.metrics || parsed?.metrics || [];
+        for (const dateStr of datesInExport(metrics)) {
+          const day = summarizeForDate(metrics, dateStr);
+          // Prefer the entry with the most data if a date spans files.
+          const score = d => (d.steps||0) + (d.sleepHours?1000:0) + (d.restingHR?500:0);
+          if (!byDate[dateStr] || score(day) > score(byDate[dateStr])) byDate[dateStr] = day;
+        }
+      }
+      const days = Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1);
+      return jsonReply(res, { days });
+    }
+
+    // GET /api/workout-history — every workout across all export files, for
+    // the workout-consistency heatmap.
+    if (pn === '/api/workout-history') {
+      const files = await recentFilesIn(WORKOUT_FOLDER_ID, 60);
+      const seen = new Set();
+      const workouts = [];
+      for (const file of files) {
+        let d;
+        try { d = JSON.parse(await downloadFile(file.id)); }
+        catch (e) { continue; }
+        (d?.data?.workouts || []).forEach(w => {
+          const key = (w.name || '') + '|' + (w.start || '');
+          if (seen.has(key)) return;
+          seen.add(key);
+          workouts.push({
+            name: w.name || 'Workout',
+            start: w.start,
+            duration: Math.round((w.duration || 0) / 60),
+            kcal: Math.round((w.activeEnergyBurned?.qty || 0) * 0.239),
+          });
+        });
+      }
+      workouts.sort((a, b) => (a.start || '') < (b.start || '') ? -1 : 1);
+      return jsonReply(res, { workouts });
     }
 
     // GET /api/workout-json

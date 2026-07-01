@@ -336,26 +336,30 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
     /* ── HEALTH TAB ──────────────────────────────────────────────── */
     let _workoutData = null;
 
+    /* Health goals + baselines */
+    const H_GOALS = { steps:12000, active:600, sleep:8 };
+    let _health = null, _healthDays = [];
+
     function loadHealthTab() {
       const iframe = document.getElementById('macros-iframe');
       if (iframe && !iframe.src) iframe.src = 'https://hilmirkarlsson.github.io/macrostracker/';
-      const h = gh();
-      const wt = parseFloat(h.wt)||84;
-      document.getElementById('h-wt2').textContent = wt+' kg';
-      document.getElementById('h-gym2').textContent = h.gym ? '✓ done' : 'tap to log';
-      document.getElementById('h-gym2').style.color = h.gym ? '#16a34a' : '#9ca3af';
-      document.querySelectorAll('#panel-health .nb').forEach(b => b.classList.toggle('sel', b.classList.contains(h.nutr||'')));
-      const pct = Math.round(Math.max(0,Math.min(100,((95-wt)/(95-70))*100)));
-      document.getElementById('h-wt-bar').style.width = pct+'%';
-      document.getElementById('h-wt-pct').textContent = pct+'%';
+      renderBodyControls();
+
       fetch(API + '/api/health-json').then(r=>r.json()).then(z=>{
-        renderZeppStats(z); renderHealthGroups(z);
+        _health = z; logWeightSnapshot();
+        try { localStorage.setItem('dash-zepp-data', JSON.stringify(z)); } catch(e){}
+        renderHealthAll(z, _healthDays);
       }).catch(()=>{
-        try { const z=JSON.parse(localStorage.getItem('dash-zepp-data')||'null'); if(z&&!isStaleZepp(z)){ renderZeppStats(z); renderHealthGroups(z); } } catch(e){}
+        try { const z=JSON.parse(localStorage.getItem('dash-zepp-data')||'null'); if(z&&!isStaleZepp(z)){ _health=z; renderHealthAll(z, _healthDays); } } catch(e){}
       });
+      fetch(API + '/api/health-history').then(r=>r.json()).then(d=>{
+        _healthDays = d.days||[]; if(_health) renderHealthAll(_health, _healthDays);
+      }).catch(()=>{});
       fetch(API + '/api/workout-json').then(r=>r.json()).then(d=>{ _workoutData=d; renderWorkouts(d,'all'); }).catch(()=>{
         document.getElementById('workout-list').innerHTML='<div style="padding:16px 20px;" class="ghost">No workout data yet</div>';
       });
+      fetch(API + '/api/workout-history').then(r=>r.json()).then(d=>renderWorkoutHeatmap(d.workouts||[])).catch(()=>{});
+
       const ds = new Date().toISOString().slice(0,10);
       document.getElementById('h-dn-link').href = 'obsidian://open?vault=Second+Brain&file=Daily+Notes%2F'+ds;
       fetchVault('Daily Notes/'+ds+'.md').then(md => {
@@ -370,67 +374,341 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       }).catch(()=>{ document.getElementById('h-daily-content').innerHTML='<div class="ghost">Start server.js to load vault data</div>'; });
     }
 
-    function editWtH() { const h=gh(); const v=prompt('Weight (kg):',h.wt||'84'); if(v!==null&&v.trim()){h.wt=v.trim();sh(h);renderH();loadHealthTab();} }
-    function togGym2() { const h=gh(); h.gym=!h.gym; sh(h); renderH(); loadHealthTab(); }
-    function setN2(v) { setN(v); loadHealthTab(); }
+    /* ── SVG helpers ─────────────────────────────────────── */
+    function svgRing(pct, color, size, stroke, center, sub) {
+      pct = Math.max(0, Math.min(100, pct||0));
+      const r=(size-stroke)/2, c=2*Math.PI*r, off=c*(1-pct/100), mid=size/2;
+      const cText = center!=null ? '<text x="'+mid+'" y="'+(mid+(sub?0:1))+'" text-anchor="middle" dominant-baseline="central" font-size="'+(size*0.28)+'" font-weight="800" fill="#111827">'+center+'</text>' : '';
+      const sText = sub ? '<text x="'+mid+'" y="'+(mid+size*0.19)+'" text-anchor="middle" font-size="'+(size*0.12)+'" font-weight="700" letter-spacing=".06em" fill="#9ca3af">'+sub+'</text>' : '';
+      return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'
+        +'<circle cx="'+mid+'" cy="'+mid+'" r="'+r+'" fill="none" stroke="#eef0f2" stroke-width="'+stroke+'"/>'
+        +'<circle cx="'+mid+'" cy="'+mid+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+stroke+'" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 '+mid+' '+mid+')"/>'
+        +cText+sText+'</svg>';
+    }
+    function svgSpark(vals, color, w, h, fill) {
+      vals = (vals||[]).filter(v=>v!=null);
+      if (vals.length < 2) return '<div class="ghost" style="font-size:11px;">no trend yet</div>';
+      const mn=Math.min(...vals), mx=Math.max(...vals), rng=(mx-mn)||1, pad=3;
+      const pts = vals.map((v,i)=>{
+        const x = pad + i*(w-2*pad)/(vals.length-1);
+        const y = h-pad - (v-mn)/rng*(h-2*pad);
+        return [x, y];
+      });
+      const line = pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+      const area = fill ? '<path d="'+line+' L'+pts[pts.length-1][0].toFixed(1)+' '+h+' L'+pts[0][0].toFixed(1)+' '+h+' Z" fill="'+color+'" opacity=".08"/>' : '';
+      return '<svg width="100%" height="'+h+'" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+area
+        +'<path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+
+    /* ── Master render ───────────────────────────────────── */
+    function renderHealthAll(z, days) {
+      renderSyncStatus(z);
+      renderReadiness(z, days);
+      renderRingCards(z, days);
+      renderMiniRow(z, days);
+      renderSleepQuality(z);
+      renderRecovery(z, days);
+      renderHeart(z);
+      renderCalories(z);
+      renderWeight(z, days);
+      renderFlags(z, days);
+    }
+
+    function renderSyncStatus(z) {
+      if (!z.synced) return;
+      const mins = Math.round((Date.now()-new Date(z.synced))/60000);
+      const stale = mins > 20;
+      const el = document.getElementById('z-sync-status');
+      el.textContent = stale ? '⚠ stale — synced '+mins+'m ago' : (mins < 1 ? 'synced just now' : 'synced '+mins+'m ago');
+      el.style.color = stale ? '#dc2626' : '';
+      el.style.fontWeight = stale ? '600' : '';
+    }
+
+    /* Averages over the last N history days, excluding today */
+    function avgOf(days, key, n) {
+      const today = new Date().toISOString().slice(0,10);
+      const vals = (days||[]).filter(d=>d.date!==today).map(d=>d[key]).filter(v=>v!=null);
+      const use = vals.slice(-(n||7));
+      return use.length ? use.reduce((a,b)=>a+b,0)/use.length : null;
+    }
+    function seriesOf(days, key, n) {
+      const today = new Date().toISOString().slice(0,10);
+      return (days||[]).filter(d=>d.date!==today).map(d=>d[key]).filter(v=>v!=null).slice(-(n||14));
+    }
+
+    function renderReadiness(z, days) {
+      const sleepComp = z.sleepHours!=null ? Math.min(100, z.sleepHours/H_GOALS.sleep*100) : 70;
+      const hrvBase = avgOf(days,'hrv') || 80;
+      const hrvComp = z.hrv!=null ? Math.max(0,Math.min(100, z.hrv/hrvBase*80)) : 70;
+      const rhrComp = z.restingHR!=null ? Math.max(0,Math.min(100, 100-(z.restingHR-50)*3)) : 70;
+      const score = Math.round(0.5*sleepComp + 0.25*hrvComp + 0.25*rhrComp);
+      const cls = score>=75?'good':score>=50?'fair':'low';
+      const col = score>=75?'#16a34a':score>=50?'#d97706':'#dc2626';
+      const label = score>=75?'Ready':score>=50?'Fair Recovery':'Low Recovery';
+      document.getElementById('rdy-ring').innerHTML = svgRing(score, col, 92, 9, score, 'READY');
+      const pill = document.getElementById('rdy-pill');
+      pill.textContent = '● '+label; pill.className = 'rdy-pill '+cls;
+      // Contextual insight — call out the limiting factor.
+      const comps = [['sleep',sleepComp],['hrv',hrvComp],['rhr',rhrComp]].sort((a,b)=>a[1]-b[1]);
+      let head='', sub='';
+      if (comps[0][0]==='sleep' && z.sleepHours!=null && z.sleepHours<H_GOALS.sleep-1) {
+        head = 'Sleep debt is building — last night ran short at '+z.sleepHours.toFixed(1)+'h.';
+        sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' still look solid, so a lighter session today plus an earlier night should reset you.';
+      } else if (score>=75) {
+        head = 'You\'re well recovered — good day to push.';
+        sub  = 'Sleep, HRV and resting heart rate all sit in a healthy range. Green light for a harder session.';
+      } else {
+        head = 'Recovery is moderate today.';
+        sub  = 'Nothing alarming, but keep intensity in check and protect tonight\'s sleep window.';
+      }
+      document.getElementById('rdy-headline').textContent = head;
+      document.getElementById('rdy-sub').textContent = sub;
+      document.getElementById('rdy-hrv').textContent = z.hrv ?? '—';
+      document.getElementById('rdy-rhr').textContent = z.restingHR ?? '—';
+      document.getElementById('rdy-slp').textContent = z.sleepHours!=null ? z.sleepHours.toFixed(1) : '—';
+    }
+
+    function cumHourly(arr) {
+      if (!arr) return null;
+      let run=0; return arr.map(v=>run+=v);
+    }
+
+    function renderRingCards(z, days) {
+      const $=id=>document.getElementById(id);
+      // Steps
+      const stepsPct = z.steps ? z.steps/H_GOALS.steps*100 : 0;
+      $('ring-steps').innerHTML = svgRing(stepsPct, '#C16A41', 46, 6, Math.round(stepsPct)+'%');
+      $('big-steps').textContent = z.steps ? z.steps.toLocaleString() : '—';
+      $('big-steps-sub').textContent = z.steps>=H_GOALS.steps ? 'Goal smashed'+(z.distanceKm?' · '+z.distanceKm+' km':'') : (z.distanceKm?z.distanceKm+' km today':'today');
+      $('spark-steps').innerHTML = svgSpark(cumHourly(z.intraday?.stepsHourly), '#C16A41', 200, 46, true);
+      const stAvg = avgOf(days,'steps');
+      $('big-steps-avg').textContent = stAvg ? '7-day avg '+(stAvg/1000).toFixed(1)+'k' : 'building history';
+      $('big-steps-side').textContent = z.flightsClimbed!=null ? z.flightsClimbed+' flights' : '';
+      // Sleep
+      const sScore = sleepScore(z);
+      $('ring-sleep').innerHTML = svgRing(sScore, '#7C8FA6', 46, 6, sScore||'—');
+      $('big-sleep').innerHTML = (z.sleepHours!=null?z.sleepHours.toFixed(1):'—')+'<span class="hbig-unit">h</span>';
+      const sBase = avgOf(days,'sleepHours');
+      $('big-sleep-sub').textContent = sBase && z.sleepHours!=null ? (z.sleepHours<sBase?(sBase-z.sleepHours).toFixed(1)+'h below your baseline':(z.sleepHours-sBase).toFixed(1)+'h above baseline') : 'last night';
+      renderSleepStages('sleep-stages', z);
+      $('big-sleep-deep').textContent = z.sleepDeep!=null ? 'deep '+z.sleepDeep+'h' : '';
+      $('big-sleep-core').textContent = z.sleepCore!=null ? 'core '+z.sleepCore+'h' : '';
+      // Active
+      const actPct = z.activeCal ? z.activeCal/H_GOALS.active*100 : 0;
+      $('ring-active').innerHTML = svgRing(actPct, '#C99A3F', 46, 6, Math.round(actPct)+'%');
+      $('big-active').textContent = z.activeCal ? z.activeCal.toLocaleString() : '—';
+      $('big-active-sub').textContent = Math.round(actPct)+'% of '+H_GOALS.active+' goal';
+      $('spark-active').innerHTML = svgSpark(cumHourly(z.intraday?.activeHourly), '#C99A3F', 200, 46, true);
+      const acAvg = avgOf(days,'activeCal');
+      $('big-active-avg').textContent = acAvg ? '7-day avg '+Math.round(acAvg) : 'building history';
+      $('big-active-side').textContent = z.basalCal ? 'basal '+z.basalCal.toLocaleString() : '';
+    }
+
+    function renderSleepStages(id, z) {
+      const el = document.getElementById(id); if (!el) return;
+      const segs = [['#3b4a63',z.sleepDeep],['#7C8FA6',z.sleepREM],['#A9BACB',z.sleepCore],['#e5e7eb',z.sleepAwake]];
+      const total = segs.reduce((s,x)=>s+(x[1]||0),0)||1;
+      el.innerHTML = segs.map(x=>x[1]?'<span style="background:'+x[0]+';width:'+(x[1]/total*100)+'%"></span>':'').join('');
+    }
+
+    function sleepScore(z) {
+      if (z.sleepHours==null) return 0;
+      const dur = Math.min(1, z.sleepHours/H_GOALS.sleep);          // duration adequacy
+      const deepRatio = z.sleepHours ? (z.sleepDeep||0)/z.sleepHours : 0;
+      const eff = Math.min(1, deepRatio/0.2);                        // ~20% deep is ideal
+      return Math.round((dur*0.75 + eff*0.25)*100);
+    }
+
+    function chipDelta(id, delta, unit, invert) {
+      const el = document.getElementById(id); if (!el) return;
+      if (delta==null || !isFinite(delta)) { el.textContent=''; el.className='chip'; return; }
+      const r = Math.round(delta*10)/10;
+      const good = invert ? r<0 : r>0;
+      el.className = 'chip '+(r===0?'':(good?'up':'down'));
+      el.textContent = (r>0?'▲ ':(r<0?'▼ ':'· '))+Math.abs(r)+(unit||'');
+    }
+
+    function renderMiniRow(z, days) {
+      const $=id=>document.getElementById(id);
+      // Resting HR — lower is better
+      $('mini-rhr').textContent = z.restingHR ?? '—';
+      const rhrAvg = avgOf(days,'restingHR');
+      chipDelta('chip-rhr', z.restingHR!=null&&rhrAvg!=null?z.restingHR-rhrAvg:null, '', true);
+      $('sub-rhr').textContent = rhrAvg ? 'vs 7-day avg '+Math.round(rhrAvg) : 'building history';
+      $('spark-rhr').innerHTML = svgSpark(seriesOf(days,'restingHR'), '#A86B6B', 56, 22, false);
+      // HRV — higher is better
+      $('mini-hrv').textContent = z.hrv ?? '—';
+      const hrvAvg = avgOf(days,'hrv');
+      chipDelta('chip-hrv', z.hrv!=null&&hrvAvg!=null?z.hrv-hrvAvg:null, '', false);
+      $('sub-hrv').textContent = hrvAvg ? 'vs baseline '+Math.round(hrvAvg)+'ms' : 'building history';
+      $('spark-hrv').innerHTML = svgSpark(seriesOf(days,'hrv'), '#C99A3F', 56, 22, false);
+      // SpO2
+      $('mini-spo2').textContent = z.spo2 ?? '—';
+      $('sub-spo2').textContent = z.spo2 ? 'blood oxygen' : 'wear overnight to capture';
+      $('spark-spo2').innerHTML = '';
+      // Resp
+      $('mini-resp').textContent = z.respiratoryRate ?? '—';
+      $('sub-resp').textContent = 'breaths per minute';
+      $('spark-resp').innerHTML = '';
+    }
+
+    function renderSleepQuality(z) {
+      const score = sleepScore(z);
+      const rating = score>=75?'Good':score>=50?'Fair':'Poor';
+      document.getElementById('sleep-score-chip').textContent = rating+' · '+score;
+      document.getElementById('sleep-score-chip').className = 'chip '+(score>=75?'up':score>=50?'warn':'down');
+      document.getElementById('sleep-donut').innerHTML = svgRing(score, '#7C8FA6', 112, 11, score, '/ 100');
+      const total = z.sleepHours||0;
+      const stages = [['Deep',z.sleepDeep,'#3b4a63'],['REM',z.sleepREM,'#7C8FA6'],['Core',z.sleepCore,'#A9BACB'],['Awake',z.sleepAwake,'#d1d5db']];
+      document.getElementById('sleep-bars').innerHTML = stages.filter(s=>s[1]!=null).map(s=>{
+        const pct = total?Math.round(s[1]/total*100):0;
+        return '<div class="sqbar-row"><span class="sqbar-name">'+s[0]+'</span>'
+          +'<span class="sqbar"><span class="sqbar-fill" style="background:'+s[2]+';width:'+pct+'%"></span></span>'
+          +'<span class="sqbar-val">'+s[1]+'h · '+pct+'%</span></div>';
+      }).join('') || '<div class="ghost">No sleep data</div>';
+      const fmtT = s => { if(!s) return '—'; return new Date(s.replace(' +0000','+00:00')).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); };
+      let note = z.sleepStart? 'In bed '+fmtT(z.sleepStart)+' – '+fmtT(z.sleepEnd)+'.' : '';
+      if (z.sleepHours!=null && z.sleepHours<H_GOALS.sleep-1) note += ' Total time was well below target — protect tonight\'s window.';
+      document.getElementById('sleep-note').textContent = note;
+    }
+
+    function renderRecovery(z, days) {
+      const rows = [];
+      const hrvBase = avgOf(days,'hrv')||80;
+      const rhrBase = avgOf(days,'restingHR')||58;
+      const add=(name,pct,tag,col)=>rows.push({name,pct:Math.max(6,Math.min(100,pct)),tag,col});
+      if (z.hrv!=null) add('HRV', z.hrv/hrvBase*80, z.hrv>=hrvBase?'Strong':'Below', z.hrv>=hrvBase?'#C99A3F':'#d97706');
+      if (z.restingHR!=null) add('Resting HR', 100-(z.restingHR-50)*3, z.restingHR<=rhrBase?'Good':'Elevated', z.restingHR<=rhrBase?'#A86B6B':'#dc2626');
+      if (z.sleepHours!=null) add('Sleep', z.sleepHours/H_GOALS.sleep*100, z.sleepHours>=7?'Strong':z.sleepHours>=6?'Fair':'Low', z.sleepHours>=7?'#5E7E63':z.sleepHours>=6?'#d97706':'#dc2626');
+      document.getElementById('recovery-bars').innerHTML = rows.map(r=>
+        '<div class="rec-row"><div class="rec-top"><span class="rec-name">'+r.name+'</span><span class="rec-tag" style="color:'+r.col+'">'+r.tag+'</span></div>'
+        +'<div class="rec-bar"><span class="rec-bar-fill" style="background:'+r.col+';width:'+r.pct+'%"></span></div></div>'
+      ).join('') || '<div class="ghost">No recovery data</div>';
+      const low = rows.slice().sort((a,b)=>a.pct-b.pct)[0];
+      const sc = document.getElementById('rec-summary');
+      if (low) sc.textContent = low.name+' is the main thing holding you back today.';
+      else sc.textContent = '';
+    }
+
+    function renderHeart(z) {
+      const $=id=>document.getElementById(id);
+      $('heart-spark').innerHTML = svgSpark(z.intraday?.hrSeries, '#A86B6B', 300, 66, true);
+      $('ht-avg').textContent  = z.avgHR ? z.avgHR+' bpm' : '—';
+      $('ht-min').textContent  = z.minHR ? z.minHR+' bpm' : '—';
+      $('ht-max').textContent  = z.maxHR ? z.maxHR+' bpm' : '—';
+      $('ht-rest').textContent = z.restingHR ? z.restingHR+' bpm' : '—';
+    }
+
+    function renderCalories(z) {
+      const $=id=>document.getElementById(id);
+      const burned = (z.activeCal||0)+(z.basalCal||0);
+      const intake = getIntake();
+      const maxV = Math.max(burned, intake, 1);
+      $('cal-burned').textContent = burned?burned.toLocaleString():'—';
+      $('cal-burned-bar').style.width = burned/maxV*100+'%';
+      $('cal-burned-meta').textContent = (z.activeCal?'Active '+z.activeCal.toLocaleString():'')+(z.basalCal?' · Basal '+z.basalCal.toLocaleString():'');
+      $('cal-intake').textContent = intake?intake.toLocaleString():'—';
+      $('cal-intake-bar').style.width = (intake/maxV*100)+'%';
+      $('cal-intake-meta').textContent = intake?'logged in Macros':'log intake in Macros ↓';
+      const net = intake-burned;
+      const chip = document.getElementById('cal-net-chip');
+      if (intake && burned) {
+        $('cal-net').textContent = (net>0?'+':'')+net.toLocaleString()+' kcal';
+        $('cal-net').style.color = net<0?'#16a34a':'#dc2626';
+        chip.textContent = net<0?Math.abs(net)+' deficit':net+' surplus';
+        chip.className = 'chip '+(net<0?'up':'warn');
+      } else { $('cal-net').textContent='—'; chip.textContent='no intake yet'; chip.className='chip'; }
+    }
+    function getIntake() {
+      // Pull today's calories from macrostracker if it shares localStorage; else 0.
+      try {
+        const keys = ['macros-today','mt-today','macrostracker-log'];
+        for (const k of keys) { const v=localStorage.getItem(k); if(v){ const d=JSON.parse(v); if(d && (d.calories||d.kcal)) return Math.round(d.calories||d.kcal); } }
+      } catch(e){}
+      return 0;
+    }
+
+    /* Weight: manual entry, snapshotted daily for a real trend line */
+    function getWeightLog(){ try{return JSON.parse(localStorage.getItem('dash-weight-log'))||{};}catch{return {};} }
+    function saveWeightLog(o){ try{localStorage.setItem('dash-weight-log',JSON.stringify(o));}catch{} }
+    function logWeightSnapshot(){
+      const h=gh(); const wt=parseFloat(h.wt); if(!wt) return;
+      const log=getWeightLog(); const today=new Date().toISOString().slice(0,10);
+      if(log[today]!==wt){ log[today]=wt; saveWeightLog(log); }
+    }
+    function renderWeight(z, days) {
+      const $=id=>document.getElementById(id);
+      const h=gh(); const wt=parseFloat(h.wt)||84;
+      $('wt-val').textContent = wt.toFixed(1);
+      const log=getWeightLog();
+      const series=Object.keys(log).sort().map(k=>log[k]);
+      $('wt-trend').innerHTML = series.length>=2 ? svgSpark(series,'#2563eb',260,52,false) : '<div class="ghost" style="font-size:11px;">trend builds as you log weight</div>';
+      const start=series.length?series[0]:wt, target=80;
+      const pct=Math.round(Math.max(0,Math.min(100,(start-wt)/(start-target)*100)));
+      $('wt-bar').style.width=pct+'%';
+      $('wt-meta').textContent = wt<=target ? 'Target reached 🎉' : pct+'% of the way · target '+target+' kg';
+      const chip=document.getElementById('wt-chip');
+      if(series.length>=2){ const d=wt-series[0]; chip.textContent=(d>0?'▲ ':'▼ ')+Math.abs(d).toFixed(1)+' kg'; chip.className='chip '+(d<0?'up':'down'); }
+      else { chip.textContent='start '+start+' kg'; chip.className='chip'; }
+    }
+
+    function renderBodyControls() {
+      const h=gh();
+      const gym=document.getElementById('h-gym2');
+      if(gym){ gym.textContent=h.gym?'✓ done':'tap to log'; gym.style.color=h.gym?'#16a34a':'#9ca3af'; }
+      document.querySelectorAll('#panel-health .nb').forEach(b=>b.classList.toggle('sel', b.classList.contains(h.nutr||'')));
+    }
+
+    function renderWorkoutHeatmap(workouts) {
+      const el=document.getElementById('wk-heat'); if(!el) return;
+      const colOf = n => /soccer|fótbolt|football/i.test(n)?'#5E7E63':/run|hlaup|walk|göngu/i.test(n)?'#C99A3F':/rest/i.test(n)?'#e5e7eb':'#C16A41';
+      // Build 5-week grid ending this week (Mon-Sun)
+      const today=new Date(); const day=(today.getDay()+6)%7; // 0=Mon
+      const monday=new Date(today); monday.setDate(today.getDate()-day-28);
+      const byDate={};
+      workouts.forEach(w=>{ if(!w.start)return; const d=w.start.slice(0,10); (byDate[d]=byDate[d]||[]).push(w); });
+      let total=0;
+      let grid='<div class="wk-grid"><span></span>'+['M','T','W','T','F','S','S'].map(d=>'<span class="wk-collbl">'+d+'</span>').join('');
+      for(let wk=0;wk<5;wk++){
+        grid+='<span class="wk-rowlbl">'+(wk===4?'Now':'W'+(wk+1))+'</span>';
+        for(let dd=0;dd<7;dd++){
+          const cur=new Date(monday); cur.setDate(monday.getDate()+wk*7+dd);
+          const ds=cur.toISOString().slice(0,10);
+          const ws=byDate[ds];
+          const future=cur>today;
+          const isToday=ds===today.toISOString().slice(0,10);
+          if(ws&&ws.length){ total++; grid+='<div class="wk-cell" style="background:'+colOf(ws[0].name)+'" title="'+ds+' · '+ws.map(w=>w.name).join(', ')+'"></div>'; }
+          else grid+='<div class="wk-cell"'+(isToday?' style="box-shadow:inset 0 0 0 2px #C16A41;background:#fff"':future?' style="background:#f7f8f9"':'')+'></div>';
+        }
+      }
+      grid+='</div>';
+      const perWk=(total/5).toFixed(1);
+      el.innerHTML=grid+'<div class="wk-summary"><div><div class="lbl">sessions</div><div class="big">'+total+'</div></div><div style="margin-top:14px;"><div class="lbl">per week</div><div class="big" style="color:#C16A41;">'+perWk+'</div></div></div>';
+      document.getElementById('wk-legend').innerHTML=['#C16A41 Gym','#5E7E63 Soccer','#C99A3F Run','#e5e7eb Rest'].map(x=>{const[c,n]=x.split(' ');return '<span><span class="dot" style="background:'+c+'"></span>'+n+'</span>';}).join('');
+    }
+
+    function renderFlags(z, days) {
+      const flags=[];
+      if(z.sleepHours!=null && z.sleepHours<6) flags.push(['#dc2626','Short sleep',z.sleepHours.toFixed(1)+'h vs '+H_GOALS.sleep+'h target']);
+      const sAvg=avgOf(days,'sleepHours');
+      if(sAvg!=null && sAvg<7) flags.push(['#d97706','Sleep debt building','7-day avg '+sAvg.toFixed(1)+'h']);
+      const hrvBase=avgOf(days,'hrv');
+      if(z.hrv!=null && hrvBase!=null && z.hrv>hrvBase*1.05) flags.push(['#16a34a','HRV above baseline',z.hrv+'ms vs '+Math.round(hrvBase)+' · good recovery signal']);
+      if(z.restingHR!=null && rhrElevated(z,days)) flags.push(['#d97706','Resting HR elevated',z.restingHR+'bpm above your usual']);
+      const el=document.getElementById('flags-list');
+      el.innerHTML = flags.length ? flags.map(f=>'<div class="flag"><span class="flag-dot" style="background:'+f[0]+'"></span><div><div class="flag-name">'+f[1]+'</div><div class="flag-sub">'+f[2]+'</div></div></div>').join('') : '<div class="ghost">All clear — nothing flagged today.</div>';
+    }
+    function rhrElevated(z,days){ const a=avgOf(days,'restingHR'); return a!=null && z.restingHR>a+4; }
+
+    function editWtH() { const h=gh(); const v=prompt('Weight (kg):',h.wt||'84'); if(v!==null&&v.trim()){h.wt=v.trim();sh(h);renderH();logWeightSnapshot();loadHealthTab();} }
+    function togGym2() { const h=gh(); h.gym=!h.gym; sh(h); renderH(); renderBodyControls(); }
+    function setN2(v) { setN(v); renderBodyControls(); }
 
     function isStaleZepp(z) {
       // Cached data from a previous day is stale once past 00:00 — the
       // daily stats (steps, calories, etc.) should reset, not persist.
       if (!z.synced) return false;
       return z.synced.slice(0,10) !== new Date().toISOString().slice(0,10);
-    }
-
-    function renderZeppStats(z) {
-      const $=id=>document.getElementById(id);
-      $('z-steps').textContent  = z.steps     ? z.steps.toLocaleString()       : '—';
-      $('z-sleep').textContent  = z.sleepHours ? z.sleepHours.toFixed(1)+'h'   : '—';
-      if (z.sleepDeep || z.sleepREM)
-        $('z-sleep-sub').textContent = (z.sleepDeep?'deep '+z.sleepDeep+'h ':'')+(z.sleepREM?'REM '+z.sleepREM+'h':'');
-      $('z-hr').textContent     = z.restingHR  ? z.restingHR+' bpm'            : '—';
-      $('z-hrv').textContent    = z.hrv        ? z.hrv+' ms'                   : '—';
-      $('z-spo2').textContent   = z.spo2       ? z.spo2+'%'                    : '—';
-      $('z-active').textContent = z.activeCal  ? z.activeCal.toLocaleString()+' kcal' : '—';
-      if (z.synced) {
-        const mins = Math.round((Date.now()-new Date(z.synced))/60000);
-        const stale = mins > 20; // export automations sync every few minutes — this old means it's stuck
-        const el = $('z-sync-status');
-        el.textContent = stale ? '⚠ stale — synced '+mins+'m ago' : (mins < 1 ? 'synced just now' : 'synced '+mins+'m ago');
-        el.style.color = stale ? '#dc2626' : '';
-        el.style.fontWeight = stale ? '600' : '';
-      }
-    }
-
-    function renderHealthGroups(z) {
-      const $=id=>document.getElementById(id);
-      const fmtT = s => {
-        if (!s) return '—';
-        const d = new Date(s.replace(' +0000','+00:00'));
-        return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-      };
-      $('hg-sleep-total').textContent  = z.sleepHours  ? z.sleepHours+'h'   : '—';
-      $('hg-sleep-inbed').textContent  = z.sleepInBed  ? z.sleepInBed+'h'   : '—';
-      $('hg-sleep-deep').textContent   = z.sleepDeep   ? z.sleepDeep+'h'    : '—';
-      $('hg-sleep-rem').textContent    = z.sleepREM    ? z.sleepREM+'h'     : '—';
-      $('hg-sleep-core').textContent   = z.sleepCore   ? z.sleepCore+'h'    : '—';
-      $('hg-sleep-awake').textContent  = z.sleepAwake  ? z.sleepAwake+'h'   : '—';
-      $('hg-sleep-start').textContent  = fmtT(z.sleepStart);
-      $('hg-sleep-end').textContent    = fmtT(z.sleepEnd);
-      $('hg-hr-resting').textContent = z.restingHR       ? z.restingHR+' bpm'        : '—';
-      $('hg-hr-hrv').textContent     = z.hrv             ? z.hrv+' ms'               : '—';
-      $('hg-hr-avg').textContent     = z.avgHR           ? z.avgHR+' bpm'            : '—';
-      $('hg-hr-min').textContent     = z.minHR           ? z.minHR+' bpm'            : '—';
-      $('hg-hr-max').textContent     = z.maxHR           ? z.maxHR+' bpm'            : '—';
-      $('hg-hr-resp').textContent    = z.respiratoryRate ? z.respiratoryRate+' /min'  : '—';
-      $('hg-act-steps').textContent   = z.steps      ? z.steps.toLocaleString()           : '—';
-      $('hg-act-dist').textContent    = z.distanceKm ? z.distanceKm+' km'                : '—';
-      $('hg-act-active').textContent  = z.activeCal  ? z.activeCal.toLocaleString()+' kcal'  : '—';
-      $('hg-act-basal').textContent   = z.basalCal   ? z.basalCal.toLocaleString()+' kcal'   : '—';
-      const total = (z.activeCal||0)+(z.basalCal||0);
-      $('hg-act-total').textContent   = total ? total.toLocaleString()+' kcal' : '—';
-      $('hg-act-flights').textContent = z.flightsClimbed != null ? z.flightsClimbed : '—';
-      $('hg-act-speed').textContent   = z.walkingSpeed  ? z.walkingSpeed+' km/h'            : '—';
-      $('hg-act-steplen').textContent = z.stepLength    ? z.stepLength+' cm'                : '—';
     }
 
     function renderWorkouts(d, filter) {
@@ -489,8 +767,10 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
         const r = await fetch(API + '/api/health-json');
         if (!r.ok) throw new Error('no data');
         const data = await r.json();
-        renderZeppStats(data); renderHealthGroups(data);
+        _health = data;
+        renderHealthAll(data, _healthDays);
         localStorage.setItem('dash-zepp-data', JSON.stringify(data));
+        fetch(API + '/api/health-history').then(r=>r.json()).then(d=>{ _healthDays=d.days||[]; renderHealthAll(data,_healthDays); }).catch(()=>{});
       } catch(e) {
         document.getElementById('z-sync-status').textContent = 'no data — export from Health Auto Export';
       }

@@ -263,6 +263,117 @@
     .body-bar{height:8px;border-radius:5px;background:#eef0f2;margin:8px 0 12px;overflow:hidden}
     .body-bar-fill{height:100%;border-radius:5px;background:#2563eb;transition:width .5s}
 
+    /* ── HEALTH · REDESIGN ───────────────────────────────── */
+    .chip{font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:20px;padding:3px 9px;letter-spacing:.02em;white-space:nowrap}
+    .chip.up{background:rgba(22,163,74,.1);color:#16a34a}
+    .chip.down{background:rgba(239,68,68,.1);color:#dc2626}
+    .chip.warn{background:rgba(217,119,6,.1);color:#d97706}
+    .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle}
+
+    /* Readiness banner */
+    .rdy{flex-direction:row;align-items:center;gap:24px;margin-bottom:18px;padding:22px 26px}
+    .rdy-ring{flex-shrink:0;width:92px;height:92px}
+    .rdy-body{flex:1;min-width:0}
+    .rdy-pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:8px}
+    .rdy-pill.good{background:rgba(22,163,74,.12);color:#16a34a}
+    .rdy-pill.fair{background:rgba(217,119,6,.12);color:#d97706}
+    .rdy-pill.low{background:rgba(239,68,68,.12);color:#dc2626}
+    .rdy-headline{font-size:19px;font-weight:700;color:#111827;letter-spacing:-.01em;line-height:1.3;margin-bottom:4px}
+    .rdy-sub{font-size:13.5px;color:#6b7280;line-height:1.5}
+    .rdy-stats{display:flex;gap:26px;flex-shrink:0;padding-left:8px}
+    .rdy-stat-v{font-size:22px;font-weight:800;color:#111827;letter-spacing:-.02em;text-align:right}
+    .rdy-stat-l{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;text-align:right;margin-top:2px}
+
+    /* Top 3 ring cards */
+    .hcard3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+    .hbig{background:#fff;border:1px solid #e8eaed;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:20px 22px;display:flex;flex-direction:column;min-height:200px}
+    .hbig-top{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+    .hbig-ico{font-size:15px}
+    .hbig-lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;flex:1}
+    .hbig-ring{width:46px;height:46px;flex-shrink:0}
+    .hbig-val{font-size:40px;font-weight:800;color:#111827;letter-spacing:-.03em;line-height:1}
+    .hbig-unit{font-size:18px;font-weight:700;color:#9ca3af;margin-left:3px}
+    .hbig-sub{font-size:12.5px;font-weight:500;color:#6b7280;margin-top:6px}
+    .hbig-spark{margin-top:auto;padding-top:14px;height:46px}
+    .hbig-stages{margin-top:auto;display:flex;border-radius:5px;overflow:hidden;background:#eef0f2}
+    .hbig-stages span{height:9px}
+    .hbig-foot{display:flex;justify-content:space-between;margin-top:10px;font-size:11.5px;color:#9ca3af;font-weight:500}
+
+    /* Secondary metric row */
+    .hmini-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
+    .hmini{background:#fff;border:1px solid #e8eaed;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:15px 17px}
+    .hmini-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+    .hmini-lbl{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af}
+    .hmini-mid{display:flex;align-items:baseline;gap:5px}
+    .hmini-val{font-size:24px;font-weight:800;color:#111827;letter-spacing:-.02em;line-height:1}
+    .hmini-unit{font-size:12px;font-weight:600;color:#9ca3af}
+    .hmini-spark{margin-left:auto;width:56px;height:22px}
+    .hmini-sub{font-size:11.5px;color:#9ca3af;font-weight:500;margin-top:8px;line-height:1.4}
+
+    /* Sleep quality */
+    .sleepq{display:flex;gap:22px;align-items:center}
+    .sleepq-donut{width:112px;height:112px;flex-shrink:0}
+    .sleepq-bars{flex:1;min-width:0}
+    .sqbar-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .sqbar-row:last-child{margin-bottom:0}
+    .sqbar-name{font-size:12.5px;font-weight:600;color:#374151;width:52px;flex-shrink:0}
+    .sqbar{flex:1;height:9px;border-radius:5px;background:#eef0f2;overflow:hidden;display:flex}
+    .sqbar-fill{height:9px;border-radius:5px}
+    .sqbar-val{font-size:12px;color:#6b7280;font-weight:500;width:78px;text-align:right;flex-shrink:0}
+    .sleepq-note{font-size:12.5px;color:#6b7280;line-height:1.5;margin-top:16px;padding-top:14px;border-top:1px solid #f3f4f6}
+
+    /* Recovery factors */
+    .rec-row{margin-bottom:14px}
+    .rec-top{display:flex;justify-content:space-between;margin-bottom:6px}
+    .rec-name{font-size:12.5px;font-weight:600;color:#374151}
+    .rec-tag{font-size:12px;font-weight:700}
+    .rec-bar{height:7px;border-radius:5px;background:#eef0f2;overflow:hidden}
+    .rec-bar-fill{height:100%;border-radius:5px;transition:width .5s}
+    .rec-summary{font-size:12.5px;color:#374151;line-height:1.5;margin-top:8px;background:#f9fafb;border-radius:10px;padding:12px 14px}
+
+    /* Heart */
+    .heart-spark{height:66px;margin-bottom:14px}
+    .heart-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+    .heart-grid .hlbl{display:inline-block;width:56px}
+
+    /* Calorie balance */
+    .calbar-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+    .calbar-lbl{font-size:12.5px;font-weight:600;color:#374151}
+    .calbar{height:9px;border-radius:5px;background:#eef0f2;overflow:hidden}
+    .calbar-fill{height:100%;border-radius:5px;transition:width .5s}
+    .calbar-meta{font-size:11px;color:#9ca3af;font-weight:500;margin-top:6px}
+
+    /* Body weight trend */
+    .wt-trend{height:52px;margin-top:10px}
+
+    /* Workout heatmap */
+    .wk-legend{display:flex;gap:12px;flex-wrap:wrap}
+    .wk-legend span{font-size:11px;font-weight:600;color:#6b7280;display:flex;align-items:center}
+    .wk-heat{display:flex;gap:16px;align-items:center}
+    .wk-grid{display:grid;grid-template-columns:auto repeat(7,1fr);gap:5px;flex:1}
+    .wk-cell{height:26px;border-radius:6px;background:#eef0f2}
+    .wk-rowlbl{font-size:10.5px;font-weight:700;color:#c2c6cc;display:flex;align-items:center;padding-right:4px}
+    .wk-collbl{font-size:10.5px;font-weight:700;color:#c2c6cc;text-align:center}
+    .wk-summary{flex-shrink:0;text-align:right;padding-left:6px}
+    .wk-summary .big{font-size:26px;font-weight:800;color:#111827;letter-spacing:-.02em;line-height:1}
+    .wk-summary .lbl{font-size:11px;color:#9ca3af;font-weight:600;margin-bottom:12px}
+
+    /* Flags */
+    .flag{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid #f3f4f6}
+    .flag:last-child{border-bottom:none}
+    .flag-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px}
+    .flag-name{font-size:13.5px;font-weight:600;color:#111827}
+    .flag-sub{font-size:12px;color:#9ca3af;margin-top:1px}
+
+    @media (max-width:900px){
+      .hcard3{grid-template-columns:1fr}
+      .hmini-row{grid-template-columns:1fr 1fr}
+      .rdy{flex-wrap:wrap;gap:16px}
+      .rdy-stats{width:100%;justify-content:space-between;padding-left:0}
+      .wk-heat{flex-direction:column;align-items:stretch}
+      .wk-summary{text-align:left;display:flex;gap:20px}
+    }
+
     /* ── PROJECTS TAB ────────────────────────────────────── */
     .pc{background:#fff;border:1px solid #e8eaed;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .15s}.pc:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
     .pc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}

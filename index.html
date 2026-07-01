@@ -283,7 +283,7 @@
     <section id="panel-health" class="tab-panel">
 
       <!-- Health section label + sync -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;">Health · Today</div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="hst-sub" id="z-sync-status">not synced</span>
@@ -291,60 +291,109 @@
         </div>
       </div>
 
-      <!-- Top stat cards -->
-      <div class="hst-row" style="margin-bottom:18px;">
-        <div class="hst"><div class="hst-lbl">Steps</div><div class="hst-val" id="z-steps">—</div><div class="hst-sub">today</div></div>
-        <div class="hst"><div class="hst-lbl">Sleep</div><div class="hst-val" id="z-sleep">—</div><div class="hst-sub" id="z-sleep-sub">hours</div></div>
-        <div class="hst"><div class="hst-lbl">Resting HR</div><div class="hst-val" id="z-hr">—</div><div class="hst-sub">bpm</div></div>
-        <div class="hst"><div class="hst-lbl">HRV</div><div class="hst-val" id="z-hrv">—</div><div class="hst-sub">ms</div></div>
-        <div class="hst"><div class="hst-lbl">SpO2</div><div class="hst-val" id="z-spo2">—</div><div class="hst-sub">blood oxygen</div></div>
-        <div class="hst"><div class="hst-lbl">Active Cal</div><div class="hst-val" id="z-active">—</div><div class="hst-sub">kcal burned</div></div>
+      <!-- Readiness banner -->
+      <div class="rdy card" id="rdy-card">
+        <div class="rdy-ring" id="rdy-ring"></div>
+        <div class="rdy-body">
+          <span class="rdy-pill" id="rdy-pill">—</span>
+          <div class="rdy-headline" id="rdy-headline">Sync your health data to see today's readiness.</div>
+          <div class="rdy-sub" id="rdy-sub"></div>
+        </div>
+        <div class="rdy-stats">
+          <div><div class="rdy-stat-v" id="rdy-hrv">—</div><div class="rdy-stat-l">HRV ms</div></div>
+          <div><div class="rdy-stat-v" id="rdy-rhr">—</div><div class="rdy-stat-l">RHR bpm</div></div>
+          <div><div class="rdy-stat-v" id="rdy-slp">—</div><div class="rdy-stat-l">Sleep h</div></div>
+        </div>
       </div>
 
-      <!-- Metric groups: Sleep / Heart / Activity -->
+      <!-- Top 3 ring cards -->
+      <div class="hcard3">
+        <div class="hbig" id="hbig-steps">
+          <div class="hbig-top"><span class="hbig-ico">👟</span><span class="hbig-lbl">Steps</span><span class="hbig-ring" id="ring-steps"></span></div>
+          <div class="hbig-val" id="big-steps">—</div>
+          <div class="hbig-sub" id="big-steps-sub">today</div>
+          <div class="hbig-spark" id="spark-steps"></div>
+          <div class="hbig-foot"><span id="big-steps-avg">—</span><span id="big-steps-side">—</span></div>
+        </div>
+        <div class="hbig" id="hbig-sleep">
+          <div class="hbig-top"><span class="hbig-ico">🌙</span><span class="hbig-lbl">Sleep</span><span class="hbig-ring" id="ring-sleep"></span></div>
+          <div class="hbig-val" id="big-sleep">—<span class="hbig-unit">h</span></div>
+          <div class="hbig-sub" id="big-sleep-sub">hours</div>
+          <div class="hbig-stages" id="sleep-stages"></div>
+          <div class="hbig-foot"><span id="big-sleep-deep">—</span><span id="big-sleep-core">—</span></div>
+        </div>
+        <div class="hbig" id="hbig-active">
+          <div class="hbig-top"><span class="hbig-ico">🔥</span><span class="hbig-lbl">Active Cal</span><span class="hbig-ring" id="ring-active"></span></div>
+          <div class="hbig-val" id="big-active">—</div>
+          <div class="hbig-sub" id="big-active-sub">kcal burned</div>
+          <div class="hbig-spark" id="spark-active"></div>
+          <div class="hbig-foot"><span id="big-active-avg">—</span><span id="big-active-side">—</span></div>
+        </div>
+      </div>
+
+      <!-- Secondary metric row -->
+      <div class="hmini-row">
+        <div class="hmini"><div class="hmini-top"><span class="hmini-lbl">Resting HR</span><span class="chip" id="chip-rhr"></span></div><div class="hmini-mid"><span class="hmini-val" id="mini-rhr">—</span><span class="hmini-unit">bpm</span><span class="hmini-spark" id="spark-rhr"></span></div><div class="hmini-sub" id="sub-rhr">—</div></div>
+        <div class="hmini"><div class="hmini-top"><span class="hmini-lbl">HRV</span><span class="chip" id="chip-hrv"></span></div><div class="hmini-mid"><span class="hmini-val" id="mini-hrv">—</span><span class="hmini-unit">ms</span><span class="hmini-spark" id="spark-hrv"></span></div><div class="hmini-sub" id="sub-hrv">—</div></div>
+        <div class="hmini"><div class="hmini-top"><span class="hmini-lbl">SpO₂</span><span class="chip" id="chip-spo2"></span></div><div class="hmini-mid"><span class="hmini-val" id="mini-spo2">—</span><span class="hmini-unit">%</span><span class="hmini-spark" id="spark-spo2"></span></div><div class="hmini-sub" id="sub-spo2">—</div></div>
+        <div class="hmini"><div class="hmini-top"><span class="hmini-lbl">Resp Rate</span><span class="chip" id="chip-resp"></span></div><div class="hmini-mid"><span class="hmini-val" id="mini-resp">—</span><span class="hmini-unit">/min</span><span class="hmini-spark" id="spark-resp"></span></div><div class="hmini-sub" id="sub-resp">—</div></div>
+      </div>
+
+      <!-- Sleep quality + Recovery factors -->
+      <div class="p23" style="margin-bottom:18px;">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div class="card-lbl" style="margin:0;">Sleep Quality · Last Night</div>
+            <span class="chip" id="sleep-score-chip">—</span>
+          </div>
+          <div class="sleepq">
+            <div class="sleepq-donut" id="sleep-donut"></div>
+            <div class="sleepq-bars" id="sleep-bars"></div>
+          </div>
+          <div class="sleepq-note" id="sleep-note"></div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">Recovery Factors</div>
+          <div id="recovery-bars"></div>
+          <div class="rec-summary" id="rec-summary"></div>
+        </div>
+      </div>
+
+      <!-- Heart + Calorie balance + Body weight -->
       <div class="p3" style="margin-bottom:18px;">
         <div class="card">
-          <div class="card-lbl">Sleep</div>
-          <div class="hrow"><span class="hlbl">Total</span><span class="hval" id="hg-sleep-total">—</span></div>
-          <div class="hrow"><span class="hlbl">In Bed</span><span class="hval" id="hg-sleep-inbed">—</span></div>
-          <div class="hrow"><span class="hlbl">Deep</span><span class="hval" id="hg-sleep-deep">—</span></div>
-          <div class="hrow"><span class="hlbl">REM</span><span class="hval" id="hg-sleep-rem">—</span></div>
-          <div class="hrow"><span class="hlbl">Core</span><span class="hval" id="hg-sleep-core">—</span></div>
-          <div class="hrow"><span class="hlbl">Awake</span><span class="hval" id="hg-sleep-awake">—</span></div>
-          <div class="hrow"><span class="hlbl">Fell asleep</span><span class="hval" id="hg-sleep-start">—</span></div>
-          <div class="hrow" style="border:none;"><span class="hlbl">Woke up</span><span class="hval" id="hg-sleep-end">—</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div class="card-lbl" style="margin:0;">Heart · Today</div><span>❤️</span>
+          </div>
+          <div class="heart-spark" id="heart-spark"></div>
+          <div class="heart-grid">
+            <div><span class="hlbl">Avg</span> <span class="hval" id="ht-avg">—</span></div>
+            <div><span class="hlbl">Min</span> <span class="hval" id="ht-min">—</span></div>
+            <div><span class="hlbl">Max</span> <span class="hval" id="ht-max">—</span></div>
+            <div><span class="hlbl">Resting</span> <span class="hval" id="ht-rest">—</span></div>
+          </div>
         </div>
         <div class="card">
-          <div class="card-lbl">Heart</div>
-          <div class="hrow"><span class="hlbl">Resting HR</span><span class="hval" id="hg-hr-resting">—</span></div>
-          <div class="hrow"><span class="hlbl">HRV</span><span class="hval" id="hg-hr-hrv">—</span></div>
-          <div class="hrow"><span class="hlbl">Avg HR</span><span class="hval" id="hg-hr-avg">—</span></div>
-          <div class="hrow"><span class="hlbl">Min HR</span><span class="hval" id="hg-hr-min">—</span></div>
-          <div class="hrow"><span class="hlbl">Max HR</span><span class="hval" id="hg-hr-max">—</span></div>
-          <div class="hrow" style="border:none;"><span class="hlbl">Resp Rate</span><span class="hval" id="hg-hr-resp">—</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div class="card-lbl" style="margin:0;">Calorie Balance</div><span class="chip" id="cal-net-chip">—</span>
+          </div>
+          <div class="calbar-row"><span class="calbar-lbl"><span class="dot" style="background:#C16A41;"></span>Burned</span><span class="hval" id="cal-burned">—</span></div>
+          <div class="calbar"><div class="calbar-fill" id="cal-burned-bar" style="background:#C16A41;width:0%"></div></div>
+          <div class="calbar-meta" id="cal-burned-meta">—</div>
+          <div class="calbar-row" style="margin-top:12px;"><span class="calbar-lbl"><span class="dot" style="background:#5E7E63;"></span>Intake</span><span class="hval" id="cal-intake">—</span></div>
+          <div class="calbar"><div class="calbar-fill" id="cal-intake-bar" style="background:#5E7E63;width:0%"></div></div>
+          <div class="calbar-meta" id="cal-intake-meta">log in Macros ↓</div>
+          <div class="hrow" style="margin-top:14px;border:none;"><span class="hlbl" style="font-weight:600;">Net balance</span><span class="hval" id="cal-net" style="font-size:15px;">—</span></div>
         </div>
         <div class="card">
-          <div class="card-lbl">Activity</div>
-          <div class="hrow"><span class="hlbl">Steps</span><span class="hval" id="hg-act-steps">—</span></div>
-          <div class="hrow"><span class="hlbl">Distance</span><span class="hval" id="hg-act-dist">—</span></div>
-          <div class="hrow"><span class="hlbl">Active Cal</span><span class="hval" id="hg-act-active">—</span></div>
-          <div class="hrow"><span class="hlbl">Basal Cal</span><span class="hval" id="hg-act-basal">—</span></div>
-          <div class="hrow"><span class="hlbl">Total Cal</span><span class="hval" id="hg-act-total">—</span></div>
-          <div class="hrow"><span class="hlbl">Flights</span><span class="hval" id="hg-act-flights">—</span></div>
-          <div class="hrow"><span class="hlbl">Walk Speed</span><span class="hval" id="hg-act-speed">—</span></div>
-          <div class="hrow" style="border:none;"><span class="hlbl">Step Length</span><span class="hval" id="hg-act-steplen">—</span></div>
-        </div>
-      </div>
-
-      <!-- Body + Obsidian (2 col) -->
-      <div class="p2" style="margin-bottom:18px;">
-        <div class="card">
-          <div class="card-lbl">Body</div>
-          <div class="hrow"><span class="hlbl">Weight</span><span class="hval tap" id="h-wt2" onclick="editWtH()">— kg</span></div>
-          <div class="hrow"><span class="hlbl">Target</span><span class="hval" style="color:#16a34a;">80 kg</span></div>
-          <div class="hrow" style="border:none;margin-bottom:4px;"><span class="hlbl">Progress</span><span class="hval" id="h-wt-pct">—</span></div>
-          <div class="body-bar"><div class="body-bar-fill" id="h-wt-bar" style="width:0%"></div></div>
-          <div class="hrow"><span class="hlbl">Gym today</span><span class="hval tap" id="h-gym2" onclick="togGym2()">—</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div class="card-lbl" style="margin:0;">Body Weight</div><span class="chip" id="wt-chip">—</span>
+          </div>
+          <div class="hbig-val" style="font-size:30px;"><span class="tap" id="wt-val" onclick="editWtH()">—</span><span class="hbig-unit">kg</span></div>
+          <div class="wt-trend" id="wt-trend"></div>
+          <div class="calbar" style="margin-top:12px;"><div class="calbar-fill" id="wt-bar" style="background:#2563eb;width:0%"></div></div>
+          <div class="calbar-meta" id="wt-meta">—</div>
+          <div class="hrow" style="margin-top:10px;"><span class="hlbl">Gym today</span><span class="hval tap" id="h-gym2" onclick="togGym2()">—</span></div>
           <div class="hrow" style="border:none;"><span class="hlbl">Nutrition</span>
             <div class="nutr">
               <button class="nb great" onclick="setN2('great')">great</button>
@@ -353,13 +402,30 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Workout consistency + Flags -->
+      <div class="p23" style="margin-bottom:18px;">
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <div class="card-lbl" style="margin:0;">Today · Obsidian</div>
-            <a id="h-dn-link" href="#" target="_blank" style="font-size:12px;color:#6b7280;text-decoration:none;">open note ↗</a>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div class="card-lbl" style="margin:0;">Workout Consistency · 5 Weeks</div>
+            <div class="wk-legend" id="wk-legend"></div>
           </div>
-          <div id="h-daily-content"><div class="ghost">Loading…</div></div>
+          <div class="wk-heat" id="wk-heat"></div>
         </div>
+        <div class="card">
+          <div class="card-lbl">Flags & Anomalies</div>
+          <div id="flags-list"><div class="ghost">All clear.</div></div>
+        </div>
+      </div>
+
+      <!-- Today · Obsidian -->
+      <div class="card" style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div class="card-lbl" style="margin:0;">Today · Obsidian</div>
+          <a id="h-dn-link" href="#" target="_blank" style="font-size:12px;color:#6b7280;text-decoration:none;">open note ↗</a>
+        </div>
+        <div id="h-daily-content"><div class="ghost">Loading…</div></div>
       </div>
 
       <!-- Workouts section -->
