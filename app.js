@@ -1,5 +1,6 @@
 'use strict';
 const pad = n => String(n).padStart(2,'0');
+const API = 'https://dashboard-production-100b.up.railway.app';
 let evs = [];
 
 /* ── TAB NAV ───────────────────────────────────────── */
@@ -278,7 +279,7 @@ renderGoals();
 
 /* ── SHARED HELPERS ─────────────────────────────────── */
 async function fetchVault(file) {
-  const r = await fetch('/api/vault?file=' + encodeURIComponent(file));
+  const r = await fetch(API + '/api/vault?file=' + encodeURIComponent(file));
   if (!r.ok) throw new Error('not found');
   return r.text();
 }
@@ -307,7 +308,7 @@ function relTime(d) {
 }
 
 /* server health check */
-fetch('/api/vault?file=CLAUDE.md').catch(()=>{
+fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
   const b=document.getElementById('server-banner');
   if(b){ b.style.display='flex'; }
 });
@@ -327,12 +328,12 @@ fetch('/api/vault?file=CLAUDE.md').catch(()=>{
       const pct = Math.round(Math.max(0,Math.min(100,((95-wt)/(95-70))*100)));
       document.getElementById('h-wt-bar').style.width = pct+'%';
       document.getElementById('h-wt-pct').textContent = pct+'%';
-      fetch('/api/health-json').then(r=>r.json()).then(z=>{
+      fetch(API + '/api/health-json').then(r=>r.json()).then(z=>{
         renderZeppStats(z); renderHealthGroups(z);
       }).catch(()=>{
         try { const z=JSON.parse(localStorage.getItem('dash-zepp-data')||'null'); if(z){ renderZeppStats(z); renderHealthGroups(z); } } catch(e){}
       });
-      fetch('/api/workout-json').then(r=>r.json()).then(d=>{ _workoutData=d; renderWorkouts(d,'all'); }).catch(()=>{
+      fetch(API + '/api/workout-json').then(r=>r.json()).then(d=>{ _workoutData=d; renderWorkouts(d,'all'); }).catch(()=>{
         document.getElementById('workout-list').innerHTML='<div style="padding:16px 20px;" class="ghost">No workout data yet</div>';
       });
       const ds = new Date().toISOString().slice(0,10);
@@ -454,7 +455,7 @@ fetch('/api/vault?file=CLAUDE.md').catch(()=>{
       const btns = ['z-sync-btn'].map(id=>document.getElementById(id)).filter(Boolean);
       btns.forEach(b=>{ b.textContent='↻ …'; b.disabled=true; });
       try {
-        const r = await fetch('/api/health-json');
+        const r = await fetch(API + '/api/health-json');
         if (!r.ok) throw new Error('no data');
         const data = await r.json();
         renderZeppStats(data); renderHealthGroups(data);
@@ -463,7 +464,7 @@ fetch('/api/vault?file=CLAUDE.md').catch(()=>{
         document.getElementById('z-sync-status').textContent = 'no data — export from Health Auto Export';
       }
       btns.forEach(b=>{ b.textContent='↻ Sync'; b.disabled=false; });
-      fetch('/api/workout-json').then(r=>r.json()).then(d=>{ _workoutData=d; renderWorkouts(d,'all'); }).catch(()=>{});
+      fetch(API + '/api/workout-json').then(r=>r.json()).then(d=>{ _workoutData=d; renderWorkouts(d,'all'); }).catch(()=>{});
     }
 
 function parseHealthCsv(csv) {
@@ -843,7 +844,7 @@ function loadObsidianTab() {
   document.getElementById('obs-goals-link').href='obsidian://open?vault=Vault&file=2-Areas%2FGoals%2FWeekly%2F'+y.getFullYear()+'-W'+String(wk).padStart(2,'0');
   renderNotes3();
   // load recent daily notes
-  fetch('/api/vault-dir?dir=Daily+Notes').then(r=>r.json()).then(files=>{
+  fetch(API + '/api/vault-dir?dir=Daily+Notes').then(r=>r.json()).then(files=>{
     const notes=files.filter(f=>!f.isDir&&f.name.endsWith('.md')).map(f=>f.name).sort().reverse().slice(0,7);
     const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     document.getElementById('obs-tab-notes').innerHTML=notes.map(n=>{
