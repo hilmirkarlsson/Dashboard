@@ -4,7 +4,7 @@
     code { word-break: break-all; }
 
     /* ── PAGE SHELL ─────────────────────────────────── */
-    .page  { min-height: 100vh; background: #ffffff; padding: 40px 48px 64px; }
+    .page  { min-height: 100vh; background: #ffffff; padding: 40px 48px 64px; transition: margin-left .35s cubic-bezier(.4,0,.2,1); }
     .inner { max-width: 1340px; margin: 0 auto; }
 
     /* ── HEADER ─────────────────────────────────────── */
@@ -18,18 +18,31 @@
     .menu-btn   { position: relative; z-index: 100; flex-shrink: 0; width: 44px; height: 44px; border-radius: 10px; background: #fff; border: 1px solid #e8eaed; box-shadow: 0 1px 2px rgba(0,0,0,.04); display: flex; align-items: center; justify-content: center; color: #111827; cursor: pointer; transition: background .15s, border-color .15s; }
     .menu-btn:hover { background: #f9fafb; border-color: #d1d5db; }
 
-    /* ── SIDEBAR ──────────────────────────────────────── */
-    .sidebar-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.4); opacity: 0; pointer-events: none; transition: opacity .2s ease-out; z-index: 90; }
+    /* ── SIDEBAR (floating bubble panel) ─────────────── */
+    .sidebar-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.35); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .25s ease-out; z-index: 90; }
     .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
-    .sidebar    { position: fixed; top: 0; left: 0; height: 100vh; width: 280px; max-width: 84vw; background: #fff; border-right: 1px solid #e8eaed; box-shadow: 4px 0 24px rgba(0,0,0,.08); transform: translateX(-100%); transition: transform .25s ease-out; z-index: 95; display: flex; flex-direction: column; padding: 20px 16px; }
+    .sidebar    {
+      position: fixed; top: 16px; left: 16px; height: calc(100vh - 32px); width: 280px; max-width: 82vw;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(232,234,237,.9); border-radius: 24px;
+      box-shadow: 0 24px 60px -12px rgba(17,24,39,.22), 0 4px 16px rgba(17,24,39,.06);
+      transform: translateX(calc(-100% - 32px)); transition: transform .35s cubic-bezier(.4,0,.2,1);
+      z-index: 95; display: flex; flex-direction: column; padding: 22px 18px;
+    }
     .sidebar.open { transform: translateX(0); }
     .sidebar-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-shrink: 0; }
     .sidebar-title { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #9ca3af; }
-    .sidebar-close { width: 36px; height: 36px; border-radius: 8px; border: none; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #374151; cursor: pointer; transition: background .15s; }
+    .sidebar-close { width: 34px; height: 34px; border-radius: 10px; border: none; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #374151; cursor: pointer; transition: background .15s; }
     .sidebar-close:hover { background: #e9eaec; }
-    .sidebar-links { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
-    .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; min-height: 44px; font-size: 14px; font-weight: 600; color: #374151; text-decoration: none; transition: background .15s; overflow-wrap: anywhere; }
-    .sidebar-link:hover { background: #f3f4f6; }
+    .sidebar-links { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
+    .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; min-height: 44px; font-size: 14px; font-weight: 600; color: #374151; text-decoration: none; transition: background .15s, transform .15s; overflow-wrap: anywhere; }
+    .sidebar-link:hover { background: rgba(37,99,235,.08); transform: translateX(2px); }
+
+    /* Desktop: sidebar can be pinned open, pushing content over instead of overlapping it */
+    @media (min-width: 641px) {
+      .sidebar-overlay { display: none; }
+      body.sidebar-open .page { margin-left: 312px; }
+    }
 
     /* ── TABS ───────────────────────────────────────── */
     .tabs { display: flex; gap: 30px; margin-top: 22px; border-bottom: 1px solid #e8eaed; }

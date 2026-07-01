@@ -17,13 +17,19 @@ function toggleSidebar(open) {
   const overlay = document.getElementById('sidebar-overlay');
   const menuBtn = document.querySelector('.menu-btn');
   const next = typeof open === 'boolean' ? open : !sidebar.classList.contains('open');
+  const isDesktop = window.innerWidth > 640;
   sidebar.classList.toggle('open', next);
   overlay.classList.toggle('open', next);
+  document.body.classList.toggle('sidebar-open', next);
   sidebar.setAttribute('aria-hidden', String(!next));
   menuBtn?.setAttribute('aria-expanded', String(next));
-  document.body.style.overflow = next ? 'hidden' : '';
+  document.body.style.overflow = (next && !isDesktop) ? 'hidden' : '';
+  if (isDesktop) { try { localStorage.setItem('dashSidebarOpen', String(next)); } catch(e) {} }
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleSidebar(false); });
+if (window.innerWidth > 640) {
+  try { if (localStorage.getItem('dashSidebarOpen') === 'true') toggleSidebar(true); } catch(e) {}
+}
 
 /* ── CLOCK TICK ────────────────────────────────────── */
 function tick() {
