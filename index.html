@@ -11,13 +11,41 @@
 </head>
 <body>
 
+<!-- QUICK LINKS SIDEBAR -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+<aside class="sidebar" id="sidebar" aria-hidden="true">
+  <div class="sidebar-hd">
+    <span class="sidebar-title">Quick Links</span>
+    <button class="sidebar-close" onclick="toggleSidebar(false)" aria-label="Close menu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <nav class="sidebar-links">
+    <a class="sidebar-link" href="../Finance/my-finance.html" target="_blank">💰 <span>Finance</span></a>
+    <a class="sidebar-link" href="obsidian://open?vault=Vault" target="_blank">🧠 <span>Obsidian</span></a>
+    <a class="sidebar-link" href="https://hilmirkarlsson.github.io/macrostracker/" target="_blank">🥗 <span>Macros</span></a>
+    <a class="sidebar-link" href="https://calendar.google.com" target="_blank">📅 <span>Calendar</span></a>
+    <a class="sidebar-link" href="https://github.com/hilmirkarlsson" target="_blank">🐙 <span>GitHub</span></a>
+    <a class="sidebar-link" href="https://isavia-eftirlit.vercel.app" target="_blank">✈️ <span>Eftirlit</span></a>
+    <a class="sidebar-link" href="https://hilmirkarlsson.github.io/Books/" target="_blank">📚 <span>Books</span></a>
+    <a class="sidebar-link" href="https://github.com/hilmirkarlsson/B-u-arkarfan" target="_blank">🛒 <span>Búðarkarfan</span></a>
+  </nav>
+</aside>
+
 <div class="page">
   <div class="inner">
 
     <!-- HEADER -->
     <header class="hd">
-      <div class="hd-title">Hilmir's Personal OS</div>
-      <div class="hd-date" id="hd-date">—</div>
+      <div class="hd-top">
+        <button class="menu-btn" onclick="toggleSidebar()" aria-label="Open quick links menu" aria-expanded="false" aria-controls="sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="hd-title">Hilmir's Personal OS</div>
+          <div class="hd-date" id="hd-date">—</div>
+        </div>
+      </div>
       <div class="hd-tagline">Everything that matters, in one calm place.</div>
       <nav class="tabs">
         <div class="tab active" data-tab="overview" onclick="setTab('overview')">Overview</div>
@@ -34,18 +62,6 @@
     <div id="server-banner" style="display:none;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e;">
       <span>⚡ Start server for Obsidian/vault features: <code style="background:#fde68a;padding:2px 6px;border-radius:4px;">node server.js</code> in Dashboard-1</span>
       <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#92400e;">×</button>
-    </div>
-
-    <!-- APP QUICK LINKS -->
-    <div class="applinks">
-      <a class="applink" href="../Finance/my-finance.html" target="_blank">💰 Finance</a>
-      <a class="applink" href="obsidian://open?vault=Vault" target="_blank">🧠 Obsidian</a>
-      <a class="applink" href="https://hilmirkarlsson.github.io/macrostracker/" target="_blank">🥗 Macros</a>
-      <a class="applink" href="https://calendar.google.com" target="_blank">📅 Calendar</a>
-      <a class="applink" href="https://github.com/hilmirkarlsson" target="_blank">🐙 GitHub</a>
-      <a class="applink" href="https://isavia-eftirlit.vercel.app" target="_blank">✈️ Eftirlit</a>
-      <a class="applink" href="https://hilmirkarlsson.github.io/Books/" target="_blank">📚 Books</a>
-      <a class="applink" href="https://github.com/hilmirkarlsson/B-u-arkarfan" target="_blank">🛒 Búðarkarfan</a>
     </div>
 
     <!-- ═══════════════ OVERVIEW PANEL ═══════════════ -->

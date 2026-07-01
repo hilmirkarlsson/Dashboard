@@ -11,6 +11,20 @@ function setTab(name) {
     travel:loadTravelTab, notes:loadNotesTab, obsidian:loadObsidianTab})[name]?.();
 }
 
+/* ── SIDEBAR ───────────────────────────────────────── */
+function toggleSidebar(open) {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const menuBtn = document.querySelector('.menu-btn');
+  const next = typeof open === 'boolean' ? open : !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', next);
+  overlay.classList.toggle('open', next);
+  sidebar.setAttribute('aria-hidden', String(!next));
+  menuBtn?.setAttribute('aria-expanded', String(next));
+  document.body.style.overflow = next ? 'hidden' : '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleSidebar(false); });
+
 /* ── CLOCK TICK ────────────────────────────────────── */
 function tick() {
   const n = new Date(), h = n.getHours();
