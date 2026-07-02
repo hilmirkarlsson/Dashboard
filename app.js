@@ -450,12 +450,23 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
     // rolling average down with them, so "deviation from baseline"
     // shrinks toward zero even while you're in real debt — the metric
     // quietly forgives a multi-night spiral instead of catching it.
+    // Rolling average of *effective* (awake-discounted) hours, so a
+    // fragmented night doesn't get counted as a full one when it becomes
+    // part of your own baseline later.
+    function avgEffectiveSleep(days, n) {
+      const today = new Date().toISOString().slice(0,10);
+      const vals = (days||[]).filter(d=>d.date!==today && d.sleepHours!=null)
+        .map(d=>effectiveSleepHours(d.sleepHours, d.sleepAwake)).slice(-(n||14));
+      return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    }
+
     function sleepBalanceScore(z, days) {
       if (z.sleepHours == null) return 70;
-      const goalComp = Math.max(0, Math.min(100, z.sleepHours/H_GOALS.sleep*100));
-      const base = avgOf(days, 'sleepHours', 14);
-      if (base == null) return Math.round(0.5*sleepDurationCurve(z.sleepHours) + 0.5*goalComp);
-      const delta = z.sleepHours - base;
+      const effToday = effectiveSleepHours(z.sleepHours, z.sleepAwake);
+      const goalComp = Math.max(0, Math.min(100, effToday/H_GOALS.sleep*100));
+      const base = avgEffectiveSleep(days, 14);
+      if (base == null) return Math.round(0.5*sleepDurationCurve(effToday) + 0.5*goalComp);
+      const delta = effToday - base;
       const pts = delta >= 0 ? Math.min(20, delta * 12) : delta * 22;
       const relComp = Math.max(0, Math.min(100, 80 + pts));
       return Math.round(0.5*relComp + 0.5*goalComp);
@@ -493,7 +504,15 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       // there's a real trend, not just one off night. When last night AND
       // the rolling balance both confirm debt, cap the score so it can't
       // cross into "Fair" on the strength of cardio markers alone.
-      const debtBuilding = sleepBal < 65;
+      //
+      // debtBuilding also checks the raw rolling baseline against the
+      // absolute goal, not just the blended sleepBal — awake-discounting
+      // a fragmented baseline night (see effectiveSleepHours) pulls the
+      // baseline itself down, which would otherwise make *today* look
+      // like less of a deviation and quietly loosen this gate right when
+      // it should be tightening it.
+      const baselineHrs  = avgEffectiveSleep(days, 14);
+      const debtBuilding = sleepBal < 65 || (baselineHrs != null && baselineHrs < H_GOALS.sleep*0.75);
       const roughNight   = prevNight < 50;
       if (roughNight && debtBuilding) score = Math.min(score, 45);
       const cls = score>=75?'good':score>=50?'fair':'low';
@@ -569,6 +588,17 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       el.innerHTML = segs.map(x=>x[1]?'<span style="background:'+x[0]+';width:'+(x[1]/total*100)+'%"></span>':'').join('');
     }
 
+    // Awake time embedded inside a sleep session is real signal a plain
+    // "total hours" figure hides — 2 hours up in the middle of the night
+    // (e.g. an airport run) still lands on a healthy-looking total if the
+    // bouts before/after add up fine. Discount duration by how much of
+    // the session was actually spent awake before treating it as sleep.
+    function effectiveSleepHours(hours, awake) {
+      if (hours == null) return null;
+      const total = hours + (awake || 0);
+      return total ? hours * (hours / total) : hours;
+    }
+
     // Duration adequacy, but as a gate rather than a plain ratio: under 4h
     // bottoms out at 0 (no partial credit — HRV/RHR are the only way up
     // from there), 4-6h only earns up to 25/100, and 6-8h ramps the rest
@@ -584,7 +614,7 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
 
     function sleepScore(z) {
       if (z.sleepHours==null) return 0;
-      const durCurve = sleepDurationCurve(z.sleepHours);
+      const durCurve = sleepDurationCurve(effectiveSleepHours(z.sleepHours, z.sleepAwake));
       const deepRatio = z.sleepHours ? (z.sleepDeep||0)/z.sleepHours : 0;
       const remRatio  = z.sleepHours ? (z.sleepREM ||0)/z.sleepHours : 0;
       const deepEff = Math.min(1, deepRatio/0.20);   // ~20% deep is the sleep-science target

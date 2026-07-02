@@ -185,6 +185,7 @@ function summarizeForDate(metrics, dateStr) {
     // baseline to compare against once enough days exist.
     sleepDeep: s ? +(s.deep || 0).toFixed(1) : null,
     sleepREM:  s ? +(s.rem  || 0).toFixed(1) : null,
+    sleepAwake: s ? +(s.awake || 0).toFixed(1) : null,
     respiratoryRate: resp.length ? +(avg(resp)).toFixed(1) : null,
   };
 }
