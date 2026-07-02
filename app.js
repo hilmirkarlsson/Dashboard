@@ -488,16 +488,21 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
     function renderReadiness(z, days) {
       // Oura-shaped contributors (Previous Night, Sleep Balance, HRV
       // Balance, RHR Balance) with Whoop's rolling-personal-baseline
-      // philosophy. Sleep still carries 60% combined weight rather than
+      // philosophy. Sleep still carries 65% combined weight rather than
       // Whoop's HRV-dominant split: HRV can read high the morning after a
       // short night (rebound/stress artifact), so it can't be trusted to
       // carry most of the score — that was exactly how a bad night used
-      // to score "Ready".
+      // to score "Ready". Previous Night specifically leans heaviest of
+      // the four — sleep-debt research (two-process model) shows recent
+      // sleep loss has disproportionately more impact on how you feel
+      // today than sleep lost further back, and apps like RISE weight
+      // last night above an equally-split rolling average for the same
+      // reason.
       const prevNight = sleepScore(z);
       const sleepBal  = sleepBalanceScore(z, days);
       const hrvBal    = hrvBalanceScore(z, days);
       const rhrBal    = rhrBalanceScore(z, days);
-      let score = Math.round(0.35*prevNight + 0.25*sleepBal + 0.20*hrvBal + 0.20*rhrBal);
+      let score = Math.round(0.45*prevNight + 0.20*sleepBal + 0.20*hrvBal + 0.15*rhrBal);
       // HRV/RHR can read fine (or even elevated — a known rebound/stress
       // artifact) after several bad nights in a row, which would let them
       // rescue the score even though the sleep contributors both agree
