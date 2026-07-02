@@ -1,5 +1,6 @@
 'use strict';
 const pad = n => String(n).padStart(2,'0');
+const fmtHM = hours => hours==null ? '—' : (h=>Math.floor(h/60)+'h '+pad(h%60)+'m')(Math.round(hours*60));
 const API = 'https://dashboard-production-100b.up.railway.app';
 let evs = [];
 
@@ -452,7 +453,7 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       const comps = [['sleep',sleepComp],['hrv',hrvComp],['rhr',rhrComp]].sort((a,b)=>a[1]-b[1]);
       let head='', sub='';
       if (comps[0][0]==='sleep' && z.sleepHours!=null && z.sleepHours<H_GOALS.sleep-1) {
-        head = 'Sleep debt is building — last night ran short at '+z.sleepHours.toFixed(1)+'h.';
+        head = 'Sleep debt is building — last night ran short at '+fmtHM(z.sleepHours)+'.';
         sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' still look solid, so a lighter session today plus an earlier night should reset you.';
       } else if (score>=75) {
         head = 'You\'re well recovered — good day to push.';
@@ -465,7 +466,7 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       document.getElementById('rdy-sub').textContent = sub;
       document.getElementById('rdy-hrv').textContent = z.hrv ?? '—';
       document.getElementById('rdy-rhr').textContent = z.restingHR ?? '—';
-      document.getElementById('rdy-slp').textContent = z.sleepHours!=null ? z.sleepHours.toFixed(1) : '—';
+      document.getElementById('rdy-slp').textContent = fmtHM(z.sleepHours);
     }
 
     function cumHourly(arr) {
@@ -487,7 +488,7 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       // Sleep
       const sScore = sleepScore(z);
       $('ring-sleep').innerHTML = svgRing(sScore, '#7C8FA6', 46, 6, sScore||'—');
-      $('big-sleep').innerHTML = (z.sleepHours!=null?z.sleepHours.toFixed(1):'—')+'<span class="hbig-unit">h</span>';
+      $('big-sleep').textContent = fmtHM(z.sleepHours);
       const sBase = avgOf(days,'sleepHours');
       $('big-sleep-sub').textContent = sBase && z.sleepHours!=null ? (z.sleepHours<sBase?(sBase-z.sleepHours).toFixed(1)+'h below your baseline':(z.sleepHours-sBase).toFixed(1)+'h above baseline') : 'last night';
       renderSleepStages('sleep-stages', z);

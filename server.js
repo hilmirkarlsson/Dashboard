@@ -107,16 +107,25 @@ async function findFolder(parentId, name) {
   return res.data.files?.[0] || null;
 }
 
+// Health Auto Export tags every sample with its originating device. The
+// iPhone's own motion coprocessor and the Amazfit band both write to
+// HealthKit, and summing every source double-counts overlapping steps —
+// so we only trust samples that came from the watch.
+const PREFERRED_SOURCE = 'zepp';
+function fromPreferredSource(e) {
+  return typeof e.source === 'string' && e.source.toLowerCase().includes(PREFERRED_SOURCE);
+}
+
 // Keep only data points recorded on the current calendar day, so
 // cumulative metrics (steps, calories, distance, ...) reset at 00:00
 // instead of accumulating across every day present in the export file.
 function onlyToday(data) {
   const today = new Date().toISOString().slice(0, 10);
-  return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === today);
+  return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === today && fromPreferredSource(e));
 }
 
 function onlyDate(data, dateStr) {
-  return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === dateStr);
+  return data.filter(e => typeof e.date === 'string' && e.date.slice(0, 10) === dateStr && fromPreferredSource(e));
 }
 
 // Intraday hourly buckets + a downsampled heart-rate line, for sparklines.
@@ -160,7 +169,7 @@ function summarizeForDate(metrics, dateStr) {
   const rhr = onlyDate(by.resting_heart_rate || [], dateStr).map(e => e.qty).filter(Boolean);
   const hrv = onlyDate(by.heart_rate_variability || [], dateStr).map(e => e.qty).filter(Boolean);
   const sleep = (by.sleep_analysis || []).filter(s =>
-    typeof s.date === 'string' && s.date.slice(0, 10) === dateStr);
+    typeof s.date === 'string' && s.date.slice(0, 10) === dateStr && fromPreferredSource(s));
   const s = sleep[sleep.length - 1];
   return {
     date: dateStr,
@@ -204,8 +213,12 @@ function normalizeHealthData(d) {
       case 'sleep_analysis': {
         // Sleep spans midnight, so report the most recent session (last
         // night) rather than filtering by today's date.
-        const s = m.data[m.data.length - 1];
-        out.sleepHours = +(s.totalSleep || 0).toFixed(1);
+        const zeppData = m.data.filter(fromPreferredSource);
+        const s = zeppData[zeppData.length - 1];
+        if (!s) break;
+        // Keep full precision here — the frontend formats hours:minutes
+        // itself, and pre-rounding to 1 decimal loses up to 6 minutes.
+        out.sleepHours = s.totalSleep || 0;
         out.sleepDeep  = +(s.deep  || 0).toFixed(1);
         out.sleepREM   = +(s.rem   || 0).toFixed(1);
         out.sleepCore  = +(s.core  || 0).toFixed(1);
