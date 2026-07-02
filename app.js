@@ -437,36 +437,67 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       return (days||[]).filter(d=>d.date!==today).map(d=>d[key]).filter(v=>v!=null).slice(-(n||14));
     }
 
+    // Rolling sleep debt/surplus vs your own 14-day average (Oura calls
+    // this "Sleep Balance"). Loss-averse on purpose: an hour under your
+    // baseline costs more than an hour over it gains, so debt reads as
+    // debt instead of averaging out against one long night. 80 at
+    // delta=0 rather than 100, since the baseline itself may carry debt.
+    function sleepBalanceScore(z, days) {
+      if (z.sleepHours == null) return 70;
+      const base = avgOf(days, 'sleepHours', 14);
+      if (base == null) return Math.round(sleepDurationCurve(z.sleepHours));
+      const delta = z.sleepHours - base;
+      const pts = delta >= 0 ? Math.min(20, delta * 12) : delta * 22;
+      return Math.max(0, Math.min(100, 80 + pts));
+    }
+
+    // HRV/RHR compared to your own rolling baseline (Whoop's approach),
+    // not a fixed population constant.
+    function hrvBalanceScore(z, days) {
+      const base = avgOf(days, 'hrv', 14);
+      if (z.hrv == null || base == null) return 70;
+      return Math.max(0, Math.min(100, z.hrv / base * 80));
+    }
+    function rhrBalanceScore(z, days) {
+      const base = avgOf(days, 'restingHR', 14);
+      if (z.restingHR == null || base == null) return 70;
+      return Math.max(0, Math.min(100, base / z.restingHR * 80));
+    }
+
     function renderReadiness(z, days) {
-      // Sleep (duration gated + deep/REM quality, see sleepScore) sets the
-      // floor; HRV and resting HR can only add on top of it, up to 15pts
-      // each. A great night still needs solid HRV/RHR to hit 100, but a
-      // bad night can no longer be averaged back up into "Ready" just
-      // because your cardio markers look fine — matching how it actually
-      // feels to wake up under-slept.
-      const sScore = sleepScore(z);
-      const hrvBase = avgOf(days,'hrv') || 80;
-      const hrvComp = z.hrv!=null ? Math.max(0,Math.min(100, z.hrv/hrvBase*80)) : 70;
-      const rhrComp = z.restingHR!=null ? Math.max(0,Math.min(100, 100-(z.restingHR-50)*3)) : 70;
-      const score = Math.round(Math.min(100, sScore + 0.15*hrvComp + 0.15*rhrComp));
+      // Oura-shaped contributors (Previous Night, Sleep Balance, HRV
+      // Balance, RHR Balance) with Whoop's rolling-personal-baseline
+      // philosophy. Sleep still carries 60% combined weight rather than
+      // Whoop's HRV-dominant split: HRV can read high the morning after a
+      // short night (rebound/stress artifact), so it can't be trusted to
+      // carry most of the score — that was exactly how a bad night used
+      // to score "Ready".
+      const prevNight = sleepScore(z);
+      const sleepBal  = sleepBalanceScore(z, days);
+      const hrvBal    = hrvBalanceScore(z, days);
+      const rhrBal    = rhrBalanceScore(z, days);
+      const score = Math.round(0.35*prevNight + 0.25*sleepBal + 0.20*hrvBal + 0.20*rhrBal);
       const cls = score>=75?'good':score>=50?'fair':'low';
       const col = score>=75?'#16a34a':score>=50?'#d97706':'#dc2626';
       const label = score>=75?'Ready':score>=50?'Fair Recovery':'Low Recovery';
       document.getElementById('rdy-ring').innerHTML = svgRing(score, col, 92, 9, score, 'READY');
       const pill = document.getElementById('rdy-pill');
       pill.textContent = '● '+label; pill.className = 'rdy-pill '+cls;
-      // Contextual insight — sleep debt dominates the message whenever
-      // it's the thing actually capping the score.
+      // Contextual insight — speaks to the trend (Sleep Balance), not just
+      // last night, so one off-night against a healthy week reads
+      // differently from genuine multi-night debt.
+      const debtBuilding = sleepBal < 65;
+      const roughNight   = prevNight < 50;
       let head='', sub='';
-      if (z.sleepHours!=null && z.sleepHours<4) {
-        head = 'Severely under-slept — last night was only '+fmtHM(z.sleepHours)+'.';
-        sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' can only do so much here — treat today as a rest day and prioritize an early night.';
-      } else if (z.sleepHours!=null && z.sleepHours<6) {
-        head = 'Sleep debt is building — last night ran short at '+fmtHM(z.sleepHours)+'.';
-        sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' are helping, but a short night still caps how ready you are — a lighter session today plus an earlier night should reset you.';
+      if (roughNight && debtBuilding) {
+        head = 'Sleep debt is building — last night ran short at '+fmtHM(z.sleepHours)+', on top of a shorter week.';
+        sub  = 'Your recent nights are trending below your own average, so HRV ('+(z.hrv??'—')+'ms) and resting HR ('+(z.restingHR??'—')+'bpm) can only offset so much today — treat it as a lighter day and protect tonight.';
+      } else if (roughNight) {
+        head = 'Last night was short ('+fmtHM(z.sleepHours)+'), but your recent sleep trend still looks solid.';
+        sub  = 'One off night against a healthy baseline — HRV ('+(z.hrv??'—')+'ms) and resting HR ('+(z.restingHR??'—')+'bpm) are holding up, so an earlier night tonight should reset you.';
       } else if (score>=75) {
         head = 'You\'re well recovered — good day to push.';
-        sub  = 'Sleep, HRV and resting heart rate all sit in a healthy range. Green light for a harder session.';
+        sub  = 'Sleep balance, HRV and resting heart rate all sit in a healthy range against your own baseline. Green light for a harder session.';
       } else {
         head = 'Recovery is moderate today.';
         sub  = 'Nothing alarming, but keep intensity in check and protect tonight\'s sleep window.';
@@ -561,13 +592,13 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       const $=id=>document.getElementById(id);
       // Resting HR — lower is better
       $('mini-rhr').textContent = z.restingHR ?? '—';
-      const rhrAvg = avgOf(days,'restingHR');
+      const rhrAvg = avgOf(days,'restingHR',14);
       chipDelta('chip-rhr', z.restingHR!=null&&rhrAvg!=null?z.restingHR-rhrAvg:null, '', true);
-      $('sub-rhr').textContent = rhrAvg ? 'vs 7-day avg '+Math.round(rhrAvg) : 'building history';
+      $('sub-rhr').textContent = rhrAvg ? 'vs 14-day avg '+Math.round(rhrAvg) : 'building history';
       $('spark-rhr').innerHTML = svgSpark(seriesOf(days,'restingHR'), '#A86B6B', 56, 22, false);
       // HRV — higher is better
       $('mini-hrv').textContent = z.hrv ?? '—';
-      const hrvAvg = avgOf(days,'hrv');
+      const hrvAvg = avgOf(days,'hrv',14);
       chipDelta('chip-hrv', z.hrv!=null&&hrvAvg!=null?z.hrv-hrvAvg:null, '', false);
       $('sub-hrv').textContent = hrvAvg ? 'vs baseline '+Math.round(hrvAvg)+'ms' : 'building history';
       $('spark-hrv').innerHTML = svgSpark(seriesOf(days,'hrv'), '#C99A3F', 56, 22, false);

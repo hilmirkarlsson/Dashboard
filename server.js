@@ -166,8 +166,9 @@ function summarizeForDate(metrics, dateStr) {
   const sum = arr => arr.reduce((s, e) => s + (e.qty || 0), 0);
   const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
   const by = {}; metrics.forEach(m => { by[m.name] = m?.data || []; });
-  const rhr = onlyDate(by.resting_heart_rate || [], dateStr).map(e => e.qty).filter(Boolean);
-  const hrv = onlyDate(by.heart_rate_variability || [], dateStr).map(e => e.qty).filter(Boolean);
+  const rhr  = onlyDate(by.resting_heart_rate || [], dateStr).map(e => e.qty).filter(Boolean);
+  const hrv  = onlyDate(by.heart_rate_variability || [], dateStr).map(e => e.qty).filter(Boolean);
+  const resp = onlyDate(by.respiratory_rate || [], dateStr).map(e => e.qty).filter(Boolean);
   const sleep = (by.sleep_analysis || []).filter(s =>
     typeof s.date === 'string' && s.date.slice(0, 10) === dateStr && fromPreferredSource(s));
   const s = sleep[sleep.length - 1];
@@ -179,6 +180,12 @@ function summarizeForDate(metrics, dateStr) {
     restingHR: rhr.length ? Math.round(rhr[rhr.length - 1]) : null,
     hrv: hrv.length ? Math.round(avg(hrv)) : null,
     sleepHours: s ? +(s.totalSleep || 0).toFixed(1) : null,
+    // Not consumed by readiness yet — backfilling history so a future
+    // respiratory-rate contributor (and per-day deep/REM trends) has a
+    // baseline to compare against once enough days exist.
+    sleepDeep: s ? +(s.deep || 0).toFixed(1) : null,
+    sleepREM:  s ? +(s.rem  || 0).toFixed(1) : null,
+    respiratoryRate: resp.length ? +(avg(resp)).toFixed(1) : null,
   };
 }
 
