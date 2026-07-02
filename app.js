@@ -442,13 +442,23 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
     // baseline costs more than an hour over it gains, so debt reads as
     // debt instead of averaging out against one long night. 80 at
     // delta=0 rather than 100, since the baseline itself may carry debt.
+    //
+    // Blended 50/50 with an absolute comparison against H_GOALS.sleep —
+    // Oura's own docs describe Sleep Balance as "compared to your
+    // baseline AND general recommendations," not baseline alone. Without
+    // the absolute half, several short nights in a row drag your own
+    // rolling average down with them, so "deviation from baseline"
+    // shrinks toward zero even while you're in real debt — the metric
+    // quietly forgives a multi-night spiral instead of catching it.
     function sleepBalanceScore(z, days) {
       if (z.sleepHours == null) return 70;
+      const goalComp = Math.max(0, Math.min(100, z.sleepHours/H_GOALS.sleep*100));
       const base = avgOf(days, 'sleepHours', 14);
-      if (base == null) return Math.round(sleepDurationCurve(z.sleepHours));
+      if (base == null) return Math.round(0.5*sleepDurationCurve(z.sleepHours) + 0.5*goalComp);
       const delta = z.sleepHours - base;
       const pts = delta >= 0 ? Math.min(20, delta * 12) : delta * 22;
-      return Math.max(0, Math.min(100, 80 + pts));
+      const relComp = Math.max(0, Math.min(100, 80 + pts));
+      return Math.round(0.5*relComp + 0.5*goalComp);
     }
 
     // HRV/RHR compared to your own rolling baseline (Whoop's approach),
@@ -476,7 +486,16 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       const sleepBal  = sleepBalanceScore(z, days);
       const hrvBal    = hrvBalanceScore(z, days);
       const rhrBal    = rhrBalanceScore(z, days);
-      const score = Math.round(0.35*prevNight + 0.25*sleepBal + 0.20*hrvBal + 0.20*rhrBal);
+      let score = Math.round(0.35*prevNight + 0.25*sleepBal + 0.20*hrvBal + 0.20*rhrBal);
+      // HRV/RHR can read fine (or even elevated — a known rebound/stress
+      // artifact) after several bad nights in a row, which would let them
+      // rescue the score even though the sleep contributors both agree
+      // there's a real trend, not just one off night. When last night AND
+      // the rolling balance both confirm debt, cap the score so it can't
+      // cross into "Fair" on the strength of cardio markers alone.
+      const debtBuilding = sleepBal < 65;
+      const roughNight   = prevNight < 50;
+      if (roughNight && debtBuilding) score = Math.min(score, 45);
       const cls = score>=75?'good':score>=50?'fair':'low';
       const col = score>=75?'#16a34a':score>=50?'#d97706':'#dc2626';
       const label = score>=75?'Ready':score>=50?'Fair Recovery':'Low Recovery';
@@ -486,8 +505,6 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       // Contextual insight — speaks to the trend (Sleep Balance), not just
       // last night, so one off-night against a healthy week reads
       // differently from genuine multi-night debt.
-      const debtBuilding = sleepBal < 65;
-      const roughNight   = prevNight < 50;
       let head='', sub='';
       if (roughNight && debtBuilding) {
         head = 'Sleep debt is building — last night ran short at '+fmtHM(z.sleepHours)+', on top of a shorter week.';
