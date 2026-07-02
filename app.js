@@ -52,7 +52,7 @@ tick(); setInterval(tick, 1000);
   document.getElementById('hd-date').textContent = D[n.getDay()]+', '+M[n.getMonth()]+' '+n.getDate()+', '+y;
   document.getElementById('caldlbl').textContent = '· '+n.getDate()+' '+M[n.getMonth()];
   document.getElementById('obs-dt').textContent = ds;
-  document.getElementById('obs-daily').href = 'obsidian://open?vault=Second+Brain&file=Daily+Notes%2F'+ds;
+  document.getElementById('obs-daily').href = 'obsidian://open?vault=Brain&file=Daily+Notes%2F'+ds;
 })();
 
 /* ── MILAN COUNTDOWN ───────────────────────────────── */
@@ -238,7 +238,7 @@ function sendInbox(){
   const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const notes=[{text:val,time},...loadNotes()].slice(0,6);
   saveNotes(notes); renderNotes();
-  window.open('obsidian://new?vault=Second+Brain&file=0-Inbox%2FQuick-'+encodeURIComponent(new Date().toISOString().slice(0,16).replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');
+  window.open('obsidian://new?vault=Brain&file=0-Inbox%2FQuick-'+encodeURIComponent(new Date().toISOString().slice(0,16).replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');
   inp.value='';
 }
 
@@ -361,7 +361,7 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       fetch(API + '/api/workout-history').then(r=>r.json()).then(d=>renderWorkoutHeatmap(d.workouts||[])).catch(()=>{});
 
       const ds = new Date().toISOString().slice(0,10);
-      document.getElementById('h-dn-link').href = 'obsidian://open?vault=Second+Brain&file=Daily+Notes%2F'+ds;
+      document.getElementById('h-dn-link').href = 'obsidian://open?vault=Brain&file=Daily+Notes%2F'+ds;
       fetchVault('Daily Notes/'+ds+'.md').then(md => {
         const hsec = parseSection(md,'Health');
         if (!hsec) { document.getElementById('h-daily-content').innerHTML='<div class="ghost">No health data in today\'s note yet</div>'; return; }
@@ -1272,12 +1272,12 @@ function loadTravelTab() {
 /* ── NOTES TAB ──────────────────────────────────────── */
 function loadNotesTab() {
   const ds=new Date().toISOString().slice(0,10);
-  document.getElementById('notes-dn-link').href='obsidian://open?vault=Second+Brain&file=Daily+Notes%2F'+ds;
+  document.getElementById('notes-dn-link').href='obsidian://open?vault=Brain&file=Daily+Notes%2F'+ds;
   renderObs2();
   fetchVault('Daily Notes/'+ds+'.md').then(md=>renderDailyNote(md,'notes-daily-content')).catch(()=>{
     document.getElementById('notes-daily-content').innerHTML=
       '<div class="ghost" style="margin-bottom:16px">No note for '+ds+' found</div>'+
-      '<a href="obsidian://new?vault=Second+Brain&file=Daily+Notes%2F'+ds+'" target="_blank" class="btn btn-dk">Create today\'s note in Obsidian</a>';
+      '<a href="obsidian://new?vault=Brain&file=Daily+Notes%2F'+ds+'" target="_blank" class="btn btn-dk">Create today\'s note in Obsidian</a>';
   });
   renderNotes2();
 }
@@ -1310,7 +1310,7 @@ function sendInbox2(){
   const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const notes=[{text:val,time},...loadNotes()].slice(0,6);
   saveNotes(notes); renderNotes2();
-  window.open('obsidian://new?vault=Second+Brain&file=0-Inbox%2FQuick-'+encodeURIComponent(new Date().toISOString().slice(0,16).replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');
+  window.open('obsidian://new?vault=Brain&file=0-Inbox%2FQuick-'+encodeURIComponent(new Date().toISOString().slice(0,16).replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');
   inp.value='';
 }
 function renderNotes2(){
@@ -1327,9 +1327,9 @@ function renderObs2(){
 function loadObsidianTab() {
   const ds=new Date().toISOString().slice(0,10);
   const y=new Date(), wk=Math.ceil((((y-new Date(y.getFullYear(),0,1))/864e5)+new Date(y.getFullYear(),0,1).getDay()+1)/7);
-  document.getElementById('obs-tab-today').href='obsidian://open?vault=Second+Brain&file=Daily+Notes%2F'+ds;
-  document.getElementById('obs-tab-new').href='obsidian://new?vault=Second+Brain&file=Daily+Notes%2F'+ds;
-  document.getElementById('obs-goals-link').href='obsidian://open?vault=Second+Brain&file=2-Areas%2FGoals%2FWeekly%2F'+y.getFullYear()+'-W'+String(wk).padStart(2,'0');
+  document.getElementById('obs-tab-today').href='obsidian://open?vault=Brain&file=Daily+Notes%2F'+ds;
+  document.getElementById('obs-tab-new').href='obsidian://new?vault=Brain&file=Daily+Notes%2F'+ds;
+  document.getElementById('obs-goals-link').href='obsidian://open?vault=Brain&file=2-Areas%2FGoals%2FWeekly%2F'+y.getFullYear()+'-W'+String(wk).padStart(2,'0');
   renderNotes3();
   // load recent daily notes
   fetch(API + '/api/vault-dir?dir=Daily+Notes').then(r=>r.json()).then(files=>{
@@ -1340,7 +1340,7 @@ function loadObsidianTab() {
       const d=new Date(dateStr+'T12:00:00');
       const label=isNaN(d)?n:MN[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
       const badge=dateStr===ds?'today':dateStr===new Date(Date.now()-864e5).toISOString().slice(0,10)?'yesterday':'';
-      return `<a href="obsidian://open?vault=Second+Brain&file=Daily+Notes%2F${encodeURIComponent(n.replace('.md',''))}" target="_blank" class="obs-note-link">`+
+      return `<a href="obsidian://open?vault=Brain&file=Daily+Notes%2F${encodeURIComponent(n.replace('.md',''))}" target="_blank" class="obs-note-link">`+
         `📓 ${label}`+(badge?` <span style="background:#111827;color:#fff;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;">${badge}</span>`:'')+
         `<span class="obs-note-link-date">${n.replace('.md','')}</span></a>`;
     }).join('');
@@ -1353,7 +1353,7 @@ function sendInbox3(){
   const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const notes=[{text:val,time},...loadNotes()].slice(0,6);
   saveNotes(notes); renderNotes3();
-  window.open('obsidian://new?vault=Second+Brain&file=0-Inbox%2FQuick-'+encodeURIComponent(new Date().toISOString().slice(0,16).replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');
+  window.open('obsidian://new?vault=Brain&file=0-Inbox%2FQuick-'+encodeURIComponent(new Date().toISOString().slice(0,16).replace(':','-'))+'&content='+encodeURIComponent(val),'_blank');
   inp.value='';
 }
 function renderNotes3(){
