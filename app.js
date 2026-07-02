@@ -438,23 +438,32 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
     }
 
     function renderReadiness(z, days) {
-      const sleepComp = z.sleepHours!=null ? Math.min(100, z.sleepHours/H_GOALS.sleep*100) : 70;
+      // Sleep (duration gated + deep/REM quality, see sleepScore) sets the
+      // floor; HRV and resting HR can only add on top of it, up to 15pts
+      // each. A great night still needs solid HRV/RHR to hit 100, but a
+      // bad night can no longer be averaged back up into "Ready" just
+      // because your cardio markers look fine — matching how it actually
+      // feels to wake up under-slept.
+      const sScore = sleepScore(z);
       const hrvBase = avgOf(days,'hrv') || 80;
       const hrvComp = z.hrv!=null ? Math.max(0,Math.min(100, z.hrv/hrvBase*80)) : 70;
       const rhrComp = z.restingHR!=null ? Math.max(0,Math.min(100, 100-(z.restingHR-50)*3)) : 70;
-      const score = Math.round(0.5*sleepComp + 0.25*hrvComp + 0.25*rhrComp);
+      const score = Math.round(Math.min(100, sScore + 0.15*hrvComp + 0.15*rhrComp));
       const cls = score>=75?'good':score>=50?'fair':'low';
       const col = score>=75?'#16a34a':score>=50?'#d97706':'#dc2626';
       const label = score>=75?'Ready':score>=50?'Fair Recovery':'Low Recovery';
       document.getElementById('rdy-ring').innerHTML = svgRing(score, col, 92, 9, score, 'READY');
       const pill = document.getElementById('rdy-pill');
       pill.textContent = '● '+label; pill.className = 'rdy-pill '+cls;
-      // Contextual insight — call out the limiting factor.
-      const comps = [['sleep',sleepComp],['hrv',hrvComp],['rhr',rhrComp]].sort((a,b)=>a[1]-b[1]);
+      // Contextual insight — sleep debt dominates the message whenever
+      // it's the thing actually capping the score.
       let head='', sub='';
-      if (comps[0][0]==='sleep' && z.sleepHours!=null && z.sleepHours<H_GOALS.sleep-1) {
+      if (z.sleepHours!=null && z.sleepHours<4) {
+        head = 'Severely under-slept — last night was only '+fmtHM(z.sleepHours)+'.';
+        sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' can only do so much here — treat today as a rest day and prioritize an early night.';
+      } else if (z.sleepHours!=null && z.sleepHours<6) {
         head = 'Sleep debt is building — last night ran short at '+fmtHM(z.sleepHours)+'.';
-        sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' still look solid, so a lighter session today plus an earlier night should reset you.';
+        sub  = (z.hrv?'Your HRV ('+z.hrv+'ms)':'Recovery markers')+(z.restingHR?' and resting HR ('+z.restingHR+'bpm)':'')+' are helping, but a short night still caps how ready you are — a lighter session today plus an earlier night should reset you.';
       } else if (score>=75) {
         head = 'You\'re well recovered — good day to push.';
         sub  = 'Sleep, HRV and resting heart rate all sit in a healthy range. Green light for a harder session.';
@@ -512,12 +521,31 @@ fetch(API + '/api/vault?file=CLAUDE.md').catch(()=>{
       el.innerHTML = segs.map(x=>x[1]?'<span style="background:'+x[0]+';width:'+(x[1]/total*100)+'%"></span>':'').join('');
     }
 
+    // Duration adequacy, but as a gate rather than a plain ratio: under 4h
+    // bottoms out at 0 (no partial credit — HRV/RHR are the only way up
+    // from there), 4-6h only earns up to 25/100, and 6-8h ramps the rest
+    // of the way. Matches sleep-debt research (Whoop "sleep performance",
+    // Oura sleep balance) treating short nights as a hard ceiling, not
+    // something recovery markers can average away.
+    function sleepDurationCurve(h) {
+      if (h <= 4) return 0;
+      if (h <= 6) return (h - 4) / 2 * 25;
+      if (h <= 8) return 25 + (h - 6) / 2 * 75;
+      return 100;
+    }
+
     function sleepScore(z) {
       if (z.sleepHours==null) return 0;
-      const dur = Math.min(1, z.sleepHours/H_GOALS.sleep);          // duration adequacy
+      const durCurve = sleepDurationCurve(z.sleepHours);
       const deepRatio = z.sleepHours ? (z.sleepDeep||0)/z.sleepHours : 0;
-      const eff = Math.min(1, deepRatio/0.2);                        // ~20% deep is ideal
-      return Math.round((dur*0.75 + eff*0.25)*100);
+      const remRatio  = z.sleepHours ? (z.sleepREM ||0)/z.sleepHours : 0;
+      const deepEff = Math.min(1, deepRatio/0.20);   // ~20% deep is the sleep-science target
+      const remEff  = Math.min(1, remRatio/0.225);   // ~20-25% REM target (midpoint 22.5%)
+      // Deep/REM quality scales the duration score by 80-100% — a short
+      // night can't be rescued by good staging, but poor staging can
+      // still dock a long one.
+      const qualityMult = 0.8 + 0.2*((deepEff+remEff)/2);
+      return Math.round(durCurve * qualityMult);
     }
 
     function chipDelta(id, delta, unit, invert) {
